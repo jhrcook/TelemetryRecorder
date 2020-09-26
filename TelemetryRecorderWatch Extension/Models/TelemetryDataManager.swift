@@ -9,12 +9,25 @@ import Foundation
 import CoreMotion
 
 class TelemetryDataManager: ObservableObject {
+    
+    var workoutInfo: WorkoutInformation? = nil
     var hardwareData = HardwareData()
     
     var numberOfHardwareDatapoints: Int {
         get {
             hardwareData.pitch.count
         }
+    }
+    
+    var date = Date()
+    var saveFileName: String {
+        let name: String = workoutInfo?.name ?? "unknown"
+        let duration = workoutInfo == nil ? "unknown" : String(workoutInfo!.duration)
+        return "workout-data_\(name)_\(duration)_\(date.description).txt"
+    }
+    
+    var saveFileURL: URL {
+        getDocumentsDirectory().appendingPathComponent(saveFileName)
     }
     
     func updateMotionData(data: CMDeviceMotion) {
@@ -30,6 +43,18 @@ class TelemetryDataManager: ObservableObject {
         hardwareData.accelY.append(acceleration.y)
         hardwareData.accelZ.append(acceleration.z)
     }
+    
+    func saveDataToFile() {
+        let data = hardwareData.dataAsDictionary()
+        let encoder = JSONEncoder()
+        
+        do {
+            let jsonData = try encoder.encode(data)
+            try jsonData.write(to: saveFileURL)
+        } catch {
+            print("erorr encoding/writing data: \(error.localizedDescription)")
+        }
+    }
 }
 
 
@@ -44,4 +69,19 @@ class HardwareData {
     var accelX = [Double]()
     var accelY = [Double]()
     var accelZ = [Double]()
+    
+    func dataAsDictionary() -> [String: [String: [Double]]] {
+        return [
+            "attitude": [
+                "pitch": pitch,
+                "yaw": yaw,
+                "roll": roll
+            ],
+            "acceleration": [
+                "x": accelX,
+                "y": accelY,
+                "z": accelZ
+            ]
+        ]
+    }
 }

@@ -12,7 +12,7 @@ struct PostWorkoutView: View {
     
     var dataManager: TelemetryDataManager
     
-    @State private var phoneSyncIsComplete = false
+    @State var phoneSyncIsComplete = false
 
     
     var body: some View {
@@ -38,13 +38,6 @@ struct PostWorkoutView: View {
     }
 }
 
-
-extension PostWorkoutView {
-    func saveAFile() {
-        // TODO: Link with iPhone and send data to then be saved to iCloud.
-        phoneSyncIsComplete = true
-    }
-}
 
 struct PostWorkoutView_Previews: PreviewProvider {
     static var previews: some View {
