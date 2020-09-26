@@ -4,10 +4,15 @@
 <dict>
 	<key>SchemeUserState</key>
 	<dict>
-		<key>TelemetryRecorder.xcscheme_^#shared#^_</key>
+		<key>TelemetryRecorderWatch (Complication).xcscheme_^#shared#^_</key>
 		<dict>
-			<key>orderHint</key>
-			<integer>0</integer>
+			<key>isShown</key>
+			<false/>
+		</dict>
+		<key>TelemetryRecorderWatch.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>isShown</key>
+			<true/>
 		</dict>
 	</dict>
 </dict>

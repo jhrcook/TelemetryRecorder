@@ -14,7 +14,69 @@
 		848393E3251F60120063125D /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 848393E2251F60120063125D /* Preview Assets.xcassets */; };
 		848393E6251F60120063125D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 848393E4251F60120063125D /* LaunchScreen.storyboard */; };
 		848393F1251F62000063125D /* iCloudFileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848393F0251F62000063125D /* iCloudFileManager.swift */; };
+		848393FC251F64C40063125D /* Interface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 848393FA251F64C40063125D /* Interface.storyboard */; };
+		848393FE251F64C70063125D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 848393FD251F64C70063125D /* Assets.xcassets */; };
+		84839405251F64C70063125D /* TelemetryRecorderWatch Extension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 84839404251F64C70063125D /* TelemetryRecorderWatch Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8483940A251F64C70063125D /* HostingController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839409251F64C70063125D /* HostingController.swift */; };
+		8483940C251F64C70063125D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483940B251F64C70063125D /* ContentView.swift */; };
+		8483940E251F64C70063125D /* ExtensionDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483940D251F64C70063125D /* ExtensionDelegate.swift */; };
+		84839410251F64C70063125D /* ComplicationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483940F251F64C70063125D /* ComplicationController.swift */; };
+		84839412251F64CA0063125D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84839411251F64CA0063125D /* Assets.xcassets */; };
+		84839415251F64CA0063125D /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 84839414251F64CA0063125D /* Preview Assets.xcassets */; };
+		84839419251F64CA0063125D /* TelemetryRecorderWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 848393F8251F64C40063125D /* TelemetryRecorderWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		84839429251F654F0063125D /* WorkoutManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839428251F654F0063125D /* WorkoutManager.swift */; };
+		84839431251F655A0063125D /* WorkoutInformation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839430251F655A0063125D /* WorkoutInformation.swift */; };
+		84839436251F65630063125D /* WorkoutChoices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839435251F65630063125D /* WorkoutChoices.swift */; };
+		8483943B251F65710063125D /* Exercise-enums.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483943A251F65710063125D /* Exercise-enums.swift */; };
+		84839440251F65780063125D /* TelemetryDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483943F251F65780063125D /* TelemetryDataManager.swift */; };
+		84839445251F65C00063125D /* WorkoutListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839444251F65C00063125D /* WorkoutListView.swift */; };
+		8483944A251F65C90063125D /* WorkoutDurationSelectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839449251F65C90063125D /* WorkoutDurationSelectionView.swift */; };
+		8483944F251F65DE0063125D /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483944E251F65DE0063125D /* StartView.swift */; };
+		84839454251F65EA0063125D /* WorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839453251F65EA0063125D /* WorkoutView.swift */; };
+		84839459251F65F40063125D /* PostWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839458251F65F40063125D /* PostWorkoutView.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		84839406251F64C70063125D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 848393CE251F60110063125D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 84839403251F64C70063125D;
+			remoteInfo = "TelemetryRecorderWatch Extension";
+		};
+		84839417251F64CA0063125D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 848393CE251F60110063125D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 848393F7251F64C40063125D;
+			remoteInfo = TelemetryRecorderWatch;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		8483941D251F64CA0063125D /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				84839405251F64C70063125D /* TelemetryRecorderWatch Extension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		84839421251F64CA0063125D /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				84839419251F64CA0063125D /* TelemetryRecorderWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		848393D6251F60110063125D /* TelemetryRecorder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TelemetryRecorder.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -27,10 +89,39 @@
 		848393E7251F60120063125D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		848393EE251F61860063125D /* TelemetryRecorder.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TelemetryRecorder.entitlements; sourceTree = "<group>"; };
 		848393F0251F62000063125D /* iCloudFileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudFileManager.swift; sourceTree = "<group>"; };
+		848393F8251F64C40063125D /* TelemetryRecorderWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TelemetryRecorderWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		848393FB251F64C40063125D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Interface.storyboard; sourceTree = "<group>"; };
+		848393FD251F64C70063125D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		848393FF251F64C70063125D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		84839404251F64C70063125D /* TelemetryRecorderWatch Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "TelemetryRecorderWatch Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		84839409251F64C70063125D /* HostingController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HostingController.swift; sourceTree = "<group>"; };
+		8483940B251F64C70063125D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		8483940D251F64C70063125D /* ExtensionDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionDelegate.swift; sourceTree = "<group>"; };
+		8483940F251F64C70063125D /* ComplicationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComplicationController.swift; sourceTree = "<group>"; };
+		84839411251F64CA0063125D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		84839414251F64CA0063125D /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		84839416251F64CA0063125D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		84839428251F654F0063125D /* WorkoutManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutManager.swift; sourceTree = "<group>"; };
+		84839430251F655A0063125D /* WorkoutInformation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutInformation.swift; sourceTree = "<group>"; };
+		84839435251F65630063125D /* WorkoutChoices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutChoices.swift; sourceTree = "<group>"; };
+		8483943A251F65710063125D /* Exercise-enums.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Exercise-enums.swift"; sourceTree = "<group>"; };
+		8483943F251F65780063125D /* TelemetryDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryDataManager.swift; sourceTree = "<group>"; };
+		84839444251F65C00063125D /* WorkoutListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutListView.swift; sourceTree = "<group>"; };
+		84839449251F65C90063125D /* WorkoutDurationSelectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutDurationSelectionView.swift; sourceTree = "<group>"; };
+		8483944E251F65DE0063125D /* StartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartView.swift; sourceTree = "<group>"; };
+		84839453251F65EA0063125D /* WorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
+		84839458251F65F40063125D /* PostWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostWorkoutView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		848393D3251F60110063125D /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		84839401251F64C70063125D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -44,6 +135,8 @@
 			isa = PBXGroup;
 			children = (
 				848393D8251F60110063125D /* TelemetryRecorder */,
+				848393F9251F64C40063125D /* TelemetryRecorderWatch */,
+				84839408251F64C70063125D /* TelemetryRecorderWatch Extension */,
 				848393D7251F60110063125D /* Products */,
 			);
 			sourceTree = "<group>";
@@ -52,6 +145,8 @@
 			isa = PBXGroup;
 			children = (
 				848393D6251F60110063125D /* TelemetryRecorder.app */,
+				848393F8251F64C40063125D /* TelemetryRecorderWatch.app */,
+				84839404251F64C70063125D /* TelemetryRecorderWatch Extension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,6 +175,72 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
+		848393F9251F64C40063125D /* TelemetryRecorderWatch */ = {
+			isa = PBXGroup;
+			children = (
+				848393FA251F64C40063125D /* Interface.storyboard */,
+				848393FD251F64C70063125D /* Assets.xcassets */,
+				848393FF251F64C70063125D /* Info.plist */,
+			);
+			path = TelemetryRecorderWatch;
+			sourceTree = "<group>";
+		};
+		84839408251F64C70063125D /* TelemetryRecorderWatch Extension */ = {
+			isa = PBXGroup;
+			children = (
+				84839427251F65290063125D /* Views */,
+				84839426251F651B0063125D /* View Models */,
+				84839425251F65170063125D /* Models */,
+				84839409251F64C70063125D /* HostingController.swift */,
+				8483940B251F64C70063125D /* ContentView.swift */,
+				8483940D251F64C70063125D /* ExtensionDelegate.swift */,
+				8483940F251F64C70063125D /* ComplicationController.swift */,
+				84839411251F64CA0063125D /* Assets.xcassets */,
+				84839416251F64CA0063125D /* Info.plist */,
+				84839413251F64CA0063125D /* Preview Content */,
+			);
+			path = "TelemetryRecorderWatch Extension";
+			sourceTree = "<group>";
+		};
+		84839413251F64CA0063125D /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				84839414251F64CA0063125D /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		84839425251F65170063125D /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				84839428251F654F0063125D /* WorkoutManager.swift */,
+				84839430251F655A0063125D /* WorkoutInformation.swift */,
+				84839435251F65630063125D /* WorkoutChoices.swift */,
+				8483943A251F65710063125D /* Exercise-enums.swift */,
+				8483943F251F65780063125D /* TelemetryDataManager.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		84839426251F651B0063125D /* View Models */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = "View Models";
+			sourceTree = "<group>";
+		};
+		84839427251F65290063125D /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				84839444251F65C00063125D /* WorkoutListView.swift */,
+				84839449251F65C90063125D /* WorkoutDurationSelectionView.swift */,
+				8483944E251F65DE0063125D /* StartView.swift */,
+				84839453251F65EA0063125D /* WorkoutView.swift */,
+				84839458251F65F40063125D /* PostWorkoutView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -91,15 +252,51 @@
 				848393D3251F60110063125D /* Frameworks */,
 				848393D4251F60110063125D /* Resources */,
 				848393F3251F631D0063125D /* Increment Build */,
+				84839421251F64CA0063125D /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				84839418251F64CA0063125D /* PBXTargetDependency */,
 			);
 			name = TelemetryRecorder;
 			productName = TelemetryRecorder;
 			productReference = 848393D6251F60110063125D /* TelemetryRecorder.app */;
 			productType = "com.apple.product-type.application";
+		};
+		848393F7251F64C40063125D /* TelemetryRecorderWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8483941E251F64CA0063125D /* Build configuration list for PBXNativeTarget "TelemetryRecorderWatch" */;
+			buildPhases = (
+				848393F6251F64C40063125D /* Resources */,
+				8483941D251F64CA0063125D /* Embed App Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				84839407251F64C70063125D /* PBXTargetDependency */,
+			);
+			name = TelemetryRecorderWatch;
+			productName = TelemetryRecorderWatch;
+			productReference = 848393F8251F64C40063125D /* TelemetryRecorderWatch.app */;
+			productType = "com.apple.product-type.application.watchapp2";
+		};
+		84839403251F64C70063125D /* TelemetryRecorderWatch Extension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8483941A251F64CA0063125D /* Build configuration list for PBXNativeTarget "TelemetryRecorderWatch Extension" */;
+			buildPhases = (
+				84839400251F64C70063125D /* Sources */,
+				84839401251F64C70063125D /* Frameworks */,
+				84839402251F64C70063125D /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "TelemetryRecorderWatch Extension";
+			productName = "TelemetryRecorderWatch Extension";
+			productReference = 84839404251F64C70063125D /* TelemetryRecorderWatch Extension.appex */;
+			productType = "com.apple.product-type.watchkit2-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -111,6 +308,12 @@
 				LastUpgradeCheck = 1200;
 				TargetAttributes = {
 					848393D5251F60110063125D = {
+						CreatedOnToolsVersion = 12.0.1;
+					};
+					848393F7251F64C40063125D = {
+						CreatedOnToolsVersion = 12.0.1;
+					};
+					84839403251F64C70063125D = {
 						CreatedOnToolsVersion = 12.0.1;
 					};
 				};
@@ -129,6 +332,8 @@
 			projectRoot = "";
 			targets = (
 				848393D5251F60110063125D /* TelemetryRecorder */,
+				848393F7251F64C40063125D /* TelemetryRecorderWatch */,
+				84839403251F64C70063125D /* TelemetryRecorderWatch Extension */,
 			);
 		};
 /* End PBXProject section */
@@ -141,6 +346,24 @@
 				848393E6251F60120063125D /* LaunchScreen.storyboard in Resources */,
 				848393E3251F60120063125D /* Preview Assets.xcassets in Resources */,
 				848393E0251F60120063125D /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		848393F6251F64C40063125D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				848393FE251F64C70063125D /* Assets.xcassets in Resources */,
+				848393FC251F64C40063125D /* Interface.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		84839402251F64C70063125D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				84839415251F64CA0063125D /* Preview Assets.xcassets in Resources */,
+				84839412251F64CA0063125D /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -179,7 +402,41 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		84839400251F64C70063125D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8483940C251F64C70063125D /* ContentView.swift in Sources */,
+				84839410251F64C70063125D /* ComplicationController.swift in Sources */,
+				84839454251F65EA0063125D /* WorkoutView.swift in Sources */,
+				84839445251F65C00063125D /* WorkoutListView.swift in Sources */,
+				8483944F251F65DE0063125D /* StartView.swift in Sources */,
+				84839431251F655A0063125D /* WorkoutInformation.swift in Sources */,
+				8483944A251F65C90063125D /* WorkoutDurationSelectionView.swift in Sources */,
+				84839429251F654F0063125D /* WorkoutManager.swift in Sources */,
+				84839459251F65F40063125D /* PostWorkoutView.swift in Sources */,
+				84839440251F65780063125D /* TelemetryDataManager.swift in Sources */,
+				8483943B251F65710063125D /* Exercise-enums.swift in Sources */,
+				84839436251F65630063125D /* WorkoutChoices.swift in Sources */,
+				8483940A251F64C70063125D /* HostingController.swift in Sources */,
+				8483940E251F64C70063125D /* ExtensionDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		84839407251F64C70063125D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 84839403251F64C70063125D /* TelemetryRecorderWatch Extension */;
+			targetProxy = 84839406251F64C70063125D /* PBXContainerItemProxy */;
+		};
+		84839418251F64CA0063125D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 848393F7251F64C40063125D /* TelemetryRecorderWatch */;
+			targetProxy = 84839417251F64CA0063125D /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		848393E4251F60120063125D /* LaunchScreen.storyboard */ = {
@@ -188,6 +445,14 @@
 				848393E5251F60120063125D /* Base */,
 			);
 			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+		848393FA251F64C40063125D /* Interface.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				848393FB251F64C40063125D /* Base */,
+			);
+			name = Interface.storyboard;
 			sourceTree = "<group>";
 		};
 /* End PBXVariantGroup section */
@@ -353,6 +618,94 @@
 			};
 			name = Release;
 		};
+		8483941B251F64CA0063125D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_COMPLICATION_NAME = Complication;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_ASSET_PATHS = "\"TelemetryRecorderWatch Extension/Preview Content\"";
+				DEVELOPMENT_TEAM = CRMHYJ9F9F;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = "TelemetryRecorderWatch Extension/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuacook.TelemetryRecorder.watchkitapp.watchkitextension;
+				PRODUCT_NAME = "${TARGET_NAME}";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 6.2;
+			};
+			name = Debug;
+		};
+		8483941C251F64CA0063125D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_COMPLICATION_NAME = Complication;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_ASSET_PATHS = "\"TelemetryRecorderWatch Extension/Preview Content\"";
+				DEVELOPMENT_TEAM = CRMHYJ9F9F;
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = "TelemetryRecorderWatch Extension/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuacook.TelemetryRecorder.watchkitapp.watchkitextension;
+				PRODUCT_NAME = "${TARGET_NAME}";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 6.2;
+			};
+			name = Release;
+		};
+		8483941F251F64CA0063125D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = CRMHYJ9F9F;
+				IBSC_MODULE = TelemetryRecorderWatch_Extension;
+				INFOPLIST_FILE = TelemetryRecorderWatch/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuacook.TelemetryRecorder.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 7.0;
+			};
+			name = Debug;
+		};
+		84839420251F64CA0063125D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = CRMHYJ9F9F;
+				IBSC_MODULE = TelemetryRecorderWatch_Extension;
+				INFOPLIST_FILE = TelemetryRecorderWatch/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.joshuacook.TelemetryRecorder.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 7.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -370,6 +723,24 @@
 			buildConfigurations = (
 				848393EB251F60120063125D /* Debug */,
 				848393EC251F60120063125D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8483941A251F64CA0063125D /* Build configuration list for PBXNativeTarget "TelemetryRecorderWatch Extension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8483941B251F64CA0063125D /* Debug */,
+				8483941C251F64CA0063125D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8483941E251F64CA0063125D /* Build configuration list for PBXNativeTarget "TelemetryRecorderWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8483941F251F64CA0063125D /* Debug */,
+				84839420251F64CA0063125D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
