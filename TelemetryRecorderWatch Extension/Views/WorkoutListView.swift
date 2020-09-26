@@ -10,26 +10,30 @@ import SwiftUI
 struct WorkoutListView: View {
     
     let workoutChoices = WorkoutChoices()
+    @Binding var workoutSelected: WorkoutInformation?
+    
+    @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
         List {
             ForEach(workoutChoices.workouts) { workoutInfo in
-                NavigationLink(
-                    destination: WorkoutDurationSelectionView(workoutInformation: workoutInfo),
-                    label: {
-                        HStack {
-                            Text(workoutInfo.name)
-                            Spacer()
-                            Image(systemName: "chevron.right").opacity(0.5)
-                        }
-                    })
+                Button(action: {
+                    userSelected(workout: workoutInfo)
+                }, label: {
+                    Text(workoutInfo.name)
+                })
             }
         }
+    }
+    
+    func userSelected(workout: WorkoutInformation) {
+        workoutSelected = workout
+        presentationMode.wrappedValue.dismiss()
     }
 }
 
 struct WorkoutListView_Previews: PreviewProvider {
     static var previews: some View {
-        WorkoutListView()
+        WorkoutListView(workoutSelected: .constant(nil))
     }
 }

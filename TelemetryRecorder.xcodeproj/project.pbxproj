@@ -34,6 +34,10 @@
 		8483944F251F65DE0063125D /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8483944E251F65DE0063125D /* StartView.swift */; };
 		84839454251F65EA0063125D /* WorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839453251F65EA0063125D /* WorkoutView.swift */; };
 		84839459251F65F40063125D /* PostWorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84839458251F65F40063125D /* PostWorkoutView.swift */; };
+		84DB7698251F9C980090CBBF /* PostWorkoutViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84DB7697251F9C980090CBBF /* PostWorkoutViewModel.swift */; };
+		84DB769D251F9CF70090CBBF /* WatchConnectivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84DB769C251F9CF70090CBBF /* WatchConnectivityManager.swift */; };
+		84FA5EDA251F959C00265275 /* GeneralFunctions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84FA5ED9251F959C00265275 /* GeneralFunctions.swift */; };
+		84FA5EDB251F959C00265275 /* GeneralFunctions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84FA5ED9251F959C00265275 /* GeneralFunctions.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -111,6 +115,9 @@
 		8483944E251F65DE0063125D /* StartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartView.swift; sourceTree = "<group>"; };
 		84839453251F65EA0063125D /* WorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
 		84839458251F65F40063125D /* PostWorkoutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostWorkoutView.swift; sourceTree = "<group>"; };
+		84DB7697251F9C980090CBBF /* PostWorkoutViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostWorkoutViewModel.swift; sourceTree = "<group>"; };
+		84DB769C251F9CF70090CBBF /* WatchConnectivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchConnectivityManager.swift; sourceTree = "<group>"; };
+		84FA5ED9251F959C00265275 /* GeneralFunctions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeneralFunctions.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -154,6 +161,7 @@
 		848393D8251F60110063125D /* TelemetryRecorder */ = {
 			isa = PBXGroup;
 			children = (
+				84FA5ED8251F958A00265275 /* General */,
 				848393EE251F61860063125D /* TelemetryRecorder.entitlements */,
 				848393E7251F60120063125D /* Info.plist */,
 				848393D9251F60110063125D /* AppDelegate.swift */,
@@ -192,7 +200,6 @@
 				84839426251F651B0063125D /* View Models */,
 				84839425251F65170063125D /* Models */,
 				84839409251F64C70063125D /* HostingController.swift */,
-				8483940B251F64C70063125D /* ContentView.swift */,
 				8483940D251F64C70063125D /* ExtensionDelegate.swift */,
 				8483940F251F64C70063125D /* ComplicationController.swift */,
 				84839411251F64CA0063125D /* Assets.xcassets */,
@@ -218,6 +225,7 @@
 				84839435251F65630063125D /* WorkoutChoices.swift */,
 				8483943A251F65710063125D /* Exercise-enums.swift */,
 				8483943F251F65780063125D /* TelemetryDataManager.swift */,
+				84DB769C251F9CF70090CBBF /* WatchConnectivityManager.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -225,6 +233,7 @@
 		84839426251F651B0063125D /* View Models */ = {
 			isa = PBXGroup;
 			children = (
+				84DB7697251F9C980090CBBF /* PostWorkoutViewModel.swift */,
 			);
 			path = "View Models";
 			sourceTree = "<group>";
@@ -232,6 +241,7 @@
 		84839427251F65290063125D /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				8483940B251F64C70063125D /* ContentView.swift */,
 				84839444251F65C00063125D /* WorkoutListView.swift */,
 				84839449251F65C90063125D /* WorkoutDurationSelectionView.swift */,
 				8483944E251F65DE0063125D /* StartView.swift */,
@@ -239,6 +249,14 @@
 				84839458251F65F40063125D /* PostWorkoutView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		84FA5ED8251F958A00265275 /* General */ = {
+			isa = PBXGroup;
+			children = (
+				84FA5ED9251F959C00265275 /* GeneralFunctions.swift */,
+			);
+			path = General;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -270,6 +288,7 @@
 			buildPhases = (
 				848393F6251F64C40063125D /* Resources */,
 				8483941D251F64CA0063125D /* Embed App Extensions */,
+				843846FC251FADF300D88607 /* Increment Build */,
 			);
 			buildRules = (
 			);
@@ -288,6 +307,7 @@
 				84839400251F64C70063125D /* Sources */,
 				84839401251F64C70063125D /* Frameworks */,
 				84839402251F64C70063125D /* Resources */,
+				84DB7696251F9C500090CBBF /* Increment Build */,
 			);
 			buildRules = (
 			);
@@ -370,7 +390,43 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		843846FC251FADF300D88607 /* Increment Build */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Increment Build";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "buildNumber=$(/usr/libexec/PlistBuddy -c \"Print CFBundleVersion\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\")\nbuildNumber=$(($buildNumber + 1))\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $buildNumber\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\"\n";
+		};
 		848393F3251F631D0063125D /* Increment Build */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Increment Build";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "buildNumber=$(/usr/libexec/PlistBuddy -c \"Print CFBundleVersion\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\")\nbuildNumber=$(($buildNumber + 1))\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $buildNumber\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\"\n";
+		};
+		84DB7696251F9C500090CBBF /* Increment Build */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -396,6 +452,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				848393DA251F60110063125D /* AppDelegate.swift in Sources */,
+				84FA5EDA251F959C00265275 /* GeneralFunctions.swift in Sources */,
 				848393F1251F62000063125D /* iCloudFileManager.swift in Sources */,
 				848393DC251F60110063125D /* SceneDelegate.swift in Sources */,
 				848393DE251F60110063125D /* ContentView.swift in Sources */,
@@ -408,15 +465,18 @@
 			files = (
 				8483940C251F64C70063125D /* ContentView.swift in Sources */,
 				84839410251F64C70063125D /* ComplicationController.swift in Sources */,
+				84DB7698251F9C980090CBBF /* PostWorkoutViewModel.swift in Sources */,
 				84839454251F65EA0063125D /* WorkoutView.swift in Sources */,
 				84839445251F65C00063125D /* WorkoutListView.swift in Sources */,
 				8483944F251F65DE0063125D /* StartView.swift in Sources */,
 				84839431251F655A0063125D /* WorkoutInformation.swift in Sources */,
 				8483944A251F65C90063125D /* WorkoutDurationSelectionView.swift in Sources */,
 				84839429251F654F0063125D /* WorkoutManager.swift in Sources */,
+				84DB769D251F9CF70090CBBF /* WatchConnectivityManager.swift in Sources */,
 				84839459251F65F40063125D /* PostWorkoutView.swift in Sources */,
 				84839440251F65780063125D /* TelemetryDataManager.swift in Sources */,
 				8483943B251F65710063125D /* Exercise-enums.swift in Sources */,
+				84FA5EDB251F959C00265275 /* GeneralFunctions.swift in Sources */,
 				84839436251F65630063125D /* WorkoutChoices.swift in Sources */,
 				8483940A251F64C70063125D /* HostingController.swift in Sources */,
 				8483940E251F64C70063125D /* ExtensionDelegate.swift in Sources */,

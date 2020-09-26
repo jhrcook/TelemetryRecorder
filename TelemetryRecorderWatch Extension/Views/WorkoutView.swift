@@ -54,6 +54,9 @@ struct WorkoutView: View {
             }
             .opacity(0)
         }
+        .onAppear {
+            dataManager.workoutInfo = workoutManager.info
+        }
     }
 }
 

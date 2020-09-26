@@ -9,13 +9,10 @@ import SwiftUI
 
 struct WorkoutDurationSelectionView: View {
     
-    init(workoutInformation: WorkoutInformation) {
-        self.workoutManager = WorkoutManager(info: workoutInformation)
-    }
-    
-    @ObservedObject var workoutManager: WorkoutManager
+    @Binding var workoutInformation: WorkoutInformation?
     @State private var selectedDuration: Int = 0
-    @State private var startWorkout = false
+    
+    @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
         VStack {
@@ -29,15 +26,15 @@ struct WorkoutDurationSelectionView: View {
             }
             .labelsHidden()
             
-            NavigationLink(
-                destination: StartView(workoutManager: self.workoutManager)) {
-                Text("OK")
-                    .foregroundColor(.white)
-                    .font(.headline)
+            Button(action: {
+                workoutInformation?.duration = selectedDuration
+                presentationMode.wrappedValue.dismiss()
+            }) {
+                Text("Okay")
             }
         }
         .onAppear {
-            self.selectedDuration = workoutManager.info.duration
+            selectedDuration = workoutInformation?.duration ?? 0
         }
     }
 }
@@ -47,6 +44,6 @@ struct WorkoutDurationSelectionView_Previews: PreviewProvider {
     static let workoutChoices = WorkoutChoices()
     
     static var previews: some View {
-        WorkoutDurationSelectionView(workoutInformation: workoutChoices.workouts[0])
+        WorkoutDurationSelectionView(workoutInformation: .constant(workoutChoices.workouts[0]))
     }
 }
