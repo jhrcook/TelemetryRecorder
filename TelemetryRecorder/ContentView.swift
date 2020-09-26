@@ -8,9 +8,23 @@
 import SwiftUI
 
 struct ContentView: View {
+    
+    @State private var watchConnectionStatus = "Watch not connected"
+    @State private var statusMessage = "Idle"
+    
+    let icloudFileManager = iCloudFileManager()
+    
     var body: some View {
-        Text("Hello, world!")
-            .padding()
+        VStack {
+            Button(action: {
+                icloudFileManager.testMakingFile()
+            }) {
+                HStack {
+                    Image(systemName: "arrow.up.doc")
+                    Text("Upload file to iCloud")
+                }
+            }
+        }
     }
 }
 

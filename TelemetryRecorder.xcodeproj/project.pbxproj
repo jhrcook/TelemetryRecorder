@@ -13,6 +13,7 @@
 		848393E0251F60120063125D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 848393DF251F60120063125D /* Assets.xcassets */; };
 		848393E3251F60120063125D /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 848393E2251F60120063125D /* Preview Assets.xcassets */; };
 		848393E6251F60120063125D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 848393E4251F60120063125D /* LaunchScreen.storyboard */; };
+		848393F1251F62000063125D /* iCloudFileManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848393F0251F62000063125D /* iCloudFileManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,8 @@
 		848393E2251F60120063125D /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		848393E5251F60120063125D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		848393E7251F60120063125D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		848393EE251F61860063125D /* TelemetryRecorder.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = TelemetryRecorder.entitlements; sourceTree = "<group>"; };
+		848393F0251F62000063125D /* iCloudFileManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iCloudFileManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,13 +59,15 @@
 		848393D8251F60110063125D /* TelemetryRecorder */ = {
 			isa = PBXGroup;
 			children = (
+				848393EE251F61860063125D /* TelemetryRecorder.entitlements */,
+				848393E7251F60120063125D /* Info.plist */,
 				848393D9251F60110063125D /* AppDelegate.swift */,
 				848393DB251F60110063125D /* SceneDelegate.swift */,
 				848393DD251F60110063125D /* ContentView.swift */,
 				848393DF251F60120063125D /* Assets.xcassets */,
 				848393E4251F60120063125D /* LaunchScreen.storyboard */,
-				848393E7251F60120063125D /* Info.plist */,
 				848393E1251F60120063125D /* Preview Content */,
+				848393F0251F62000063125D /* iCloudFileManager.swift */,
 			);
 			path = TelemetryRecorder;
 			sourceTree = "<group>";
@@ -85,6 +90,7 @@
 				848393D2251F60110063125D /* Sources */,
 				848393D3251F60110063125D /* Frameworks */,
 				848393D4251F60110063125D /* Resources */,
+				848393F3251F631D0063125D /* Increment Build */,
 			);
 			buildRules = (
 			);
@@ -140,12 +146,34 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		848393F3251F631D0063125D /* Increment Build */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Increment Build";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "buildNumber=$(/usr/libexec/PlistBuddy -c \"Print CFBundleVersion\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\")\nbuildNumber=$(($buildNumber + 1))\n/usr/libexec/PlistBuddy -c \"Set :CFBundleVersion $buildNumber\" \"${PROJECT_DIR}/${INFOPLIST_FILE}\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		848393D2251F60110063125D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				848393DA251F60110063125D /* AppDelegate.swift in Sources */,
+				848393F1251F62000063125D /* iCloudFileManager.swift in Sources */,
 				848393DC251F60110063125D /* SceneDelegate.swift in Sources */,
 				848393DE251F60110063125D /* ContentView.swift in Sources */,
 			);
@@ -286,6 +314,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = TelemetryRecorder/TelemetryRecorder.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"TelemetryRecorder/Preview Content\"";
 				DEVELOPMENT_TEAM = CRMHYJ9F9F;
@@ -307,6 +336,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = TelemetryRecorder/TelemetryRecorder.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"TelemetryRecorder/Preview Content\"";
 				DEVELOPMENT_TEAM = CRMHYJ9F9F;
