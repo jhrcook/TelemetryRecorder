@@ -12,6 +12,8 @@ import CoreMotion
 struct WorkoutView: View {
     
     @ObservedObject var workoutManager: WorkoutManager
+    var watchCommunicator: WatchConnectivityManager
+    
     var dataManager = TelemetryDataManager()
     
     let motionManager = CMMotionManager()
@@ -20,86 +22,42 @@ struct WorkoutView: View {
     @State var amountOfDataCollected: Int = 0
     
     @State private var workoutComplete = false
+    @State var dataTransferComplete = false
+    
+    @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        ZStack {
-            VStack {
-                Spacer()
-                
-                Text("Number of telemetry data points")
-                    .multilineTextAlignment(.center)
-                    .padding(.vertical, 5)
-                Text("\(amountOfDataCollected)")
-                    .font(.title)
-                    .foregroundColor(.green)
-                
-                Spacer()
-                
-                Button(action: {
-                    stopMotionManagerCollection()
-                    workoutComplete.toggle()
-                }) {
-                    Text("Done")
-                }
-            }
-            .navigationBarBackButtonHidden(true)
-            .onAppear {
-                startMotionManagerCollection()
-            }
+        VStack {
+            Spacer()
             
-            NavigationLink(
-                destination: PostWorkoutView(dataManager: dataManager),
-                isActive: $workoutComplete) {
-                EmptyView()
+            Text("Number of telemetry data points")
+                .multilineTextAlignment(.center)
+                .padding(.vertical, 5)
+            Text("\(amountOfDataCollected)")
+                .font(.title)
+                .foregroundColor(.green)
+            
+            Spacer()
+            
+            Button(action: {
+                stopMotionManagerCollection()
+                workoutComplete.toggle()
+            }) {
+                Text("Done")
             }
-            .opacity(0)
+        }
+        .navigationBarBackButtonHidden(true)
+        .onAppear {
+            startMotionManagerCollection()
         }
         .onAppear {
             dataManager.workoutInfo = workoutManager.info
         }
-    }
-}
-
-
-
-extension WorkoutView {
-    func startMotionManagerCollection() {
-        
-        motionManager.startDeviceMotionUpdates(to: queue) { (data: CMDeviceMotion?, error: Error?) in
-            guard let data = data else {
-                if let error = error {
-                    print("Error: \(error.localizedDescription)")
-                } else {
-                    print("Error in data collection but no error thrown.")
-                }
-                return
-            }
-            
-            dataManager.updateMotionData(data: data)
-            DispatchQueue.main.async {
-                amountOfDataCollected = dataManager.numberOfHardwareDatapoints
-            }
+        .sheet(isPresented: $workoutComplete, onDismiss: {
+            presentationMode.wrappedValue.dismiss()
+        }) {
+            PostWorkoutView(dataManager: dataManager)
         }
-        
-        motionManager.startAccelerometerUpdates(to: queue) { (data: CMAccelerometerData?, error: Error?) in
-            guard let data = data else {
-                if let error = error {
-                    print("Error: \(error.localizedDescription)")
-                } else {
-                    print("Error in data collection but no error thrown.")
-                }
-                return
-            }
-            
-            dataManager.updateAccelerationData(data: data)
-        }
-        
-    }
-    
-    
-    func stopMotionManagerCollection() {
-        motionManager.stopDeviceMotionUpdates()
-        motionManager.stopAccelerometerUpdates()
     }
 }
 
@@ -108,6 +66,6 @@ extension WorkoutView {
 struct WorkoutView_Previews: PreviewProvider {
     static let workoutChoices = WorkoutChoices()
     static var previews: some View {
-        WorkoutView(workoutManager: WorkoutManager(info: workoutChoices.workouts[0]))
+        WorkoutView(workoutManager: WorkoutManager(info: workoutChoices.workouts[0]), watchCommunicator: WatchConnectivityManager())
     }
 }

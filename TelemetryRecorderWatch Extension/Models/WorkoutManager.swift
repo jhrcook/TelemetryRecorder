@@ -8,9 +8,9 @@
 import Foundation
 
 class WorkoutManager: NSObject, ObservableObject {
-    var info: WorkoutInformation
+    var info: WorkoutInformation?
     
-    init(info: WorkoutInformation) {
+    init(info: WorkoutInformation?) {
         self.info = info
     }
 }

@@ -8,32 +8,39 @@
 import SwiftUI
 
 
+
+
 struct PostWorkoutView: View {
     
     var dataManager: TelemetryDataManager
     
-    @State var phoneSyncIsComplete = false
-
+    @Environment(\.presentationMode) var presentationMode
+    @State var saveFileStatus: TaskStatus = .incomplete
+    @State var transferFileStatus: TaskStatus = .incomplete
+    
+    @State private var checkCancel = false
     
     var body: some View {
-        ZStack {
-            VStack {
-                Text("Syncing with iCloud...")
-                
-                Button(action: {
-                    saveAFile()
-                }, label: {
-                    Text("Save a file!")
-                })
-            }
-            .navigationBarBackButtonHidden(true)
+        VStack {
             
-            NavigationLink(
-                destination: ContentView(),
-                isActive: $phoneSyncIsComplete) {
-                EmptyView()
-            }
-            .opacity(0)
+            Spacer()
+            
+            TaskCheckView(text: "Saved file", status: $saveFileStatus)
+            TaskCheckView(text: "Transfered file", status: $transferFileStatus)
+            
+            Spacer()
+            
+            Button(action: {
+                saveAndSyncData()
+                presentationMode.wrappedValue.dismiss()
+            }, label: {
+                Text("Save data")
+            })
+            Button(action: {
+                presentationMode.wrappedValue.dismiss()
+            }, label: {
+                Text("Cancel")
+            })
         }
     }
 }

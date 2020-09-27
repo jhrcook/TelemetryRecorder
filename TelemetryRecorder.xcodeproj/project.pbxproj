@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		840820422520B4D7001E434C /* WorkoutViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840820412520B4D7001E434C /* WorkoutViewModel.swift */; };
+		840820482520B85B001E434C /* TaskCheckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840820472520B85B001E434C /* TaskCheckView.swift */; };
 		848393DA251F60110063125D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848393D9251F60110063125D /* AppDelegate.swift */; };
 		848393DC251F60110063125D /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848393DB251F60110063125D /* SceneDelegate.swift */; };
 		848393DE251F60110063125D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848393DD251F60110063125D /* ContentView.swift */; };
@@ -83,6 +85,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		840820412520B4D7001E434C /* WorkoutViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViewModel.swift; sourceTree = "<group>"; };
+		840820472520B85B001E434C /* TaskCheckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCheckView.swift; sourceTree = "<group>"; };
 		848393D6251F60110063125D /* TelemetryRecorder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TelemetryRecorder.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		848393D9251F60110063125D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		848393DB251F60110063125D /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -138,6 +142,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		840820462520B84D001E434C /* Subviews */ = {
+			isa = PBXGroup;
+			children = (
+				840820472520B85B001E434C /* TaskCheckView.swift */,
+			);
+			path = Subviews;
+			sourceTree = "<group>";
+		};
 		848393CD251F60110063125D = {
 			isa = PBXGroup;
 			children = (
@@ -196,6 +208,7 @@
 		84839408251F64C70063125D /* TelemetryRecorderWatch Extension */ = {
 			isa = PBXGroup;
 			children = (
+				840820462520B84D001E434C /* Subviews */,
 				84839427251F65290063125D /* Views */,
 				84839426251F651B0063125D /* View Models */,
 				84839425251F65170063125D /* Models */,
@@ -234,6 +247,7 @@
 			isa = PBXGroup;
 			children = (
 				84DB7697251F9C980090CBBF /* PostWorkoutViewModel.swift */,
+				840820412520B4D7001E434C /* WorkoutViewModel.swift */,
 			);
 			path = "View Models";
 			sourceTree = "<group>";
@@ -466,6 +480,7 @@
 				8483940C251F64C70063125D /* ContentView.swift in Sources */,
 				84839410251F64C70063125D /* ComplicationController.swift in Sources */,
 				84DB7698251F9C980090CBBF /* PostWorkoutViewModel.swift in Sources */,
+				840820482520B85B001E434C /* TaskCheckView.swift in Sources */,
 				84839454251F65EA0063125D /* WorkoutView.swift in Sources */,
 				84839445251F65C00063125D /* WorkoutListView.swift in Sources */,
 				8483944F251F65DE0063125D /* StartView.swift in Sources */,
@@ -473,6 +488,7 @@
 				8483944A251F65C90063125D /* WorkoutDurationSelectionView.swift in Sources */,
 				84839429251F654F0063125D /* WorkoutManager.swift in Sources */,
 				84DB769D251F9CF70090CBBF /* WatchConnectivityManager.swift in Sources */,
+				840820422520B4D7001E434C /* WorkoutViewModel.swift in Sources */,
 				84839459251F65F40063125D /* PostWorkoutView.swift in Sources */,
 				84839440251F65780063125D /* TelemetryDataManager.swift in Sources */,
 				8483943B251F65710063125D /* Exercise-enums.swift in Sources */,

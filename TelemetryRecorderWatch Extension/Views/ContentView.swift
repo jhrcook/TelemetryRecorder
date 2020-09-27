@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     
     var watchCommunicator = WatchConnectivityManager()
+    var workoutManager = WorkoutManager(info: nil)
     
     @State private var showWorkoutList = false
     @State var workoutInfo: WorkoutInformation? = nil
@@ -28,7 +29,11 @@ struct ContentView: View {
             }) {
                 Text(workoutInfo?.name ?? "none")
             }
-            .sheet(isPresented: $showWorkoutList, content: { WorkoutListView(workoutSelected: $workoutInfo) })
+            .sheet(isPresented: $showWorkoutList, onDismiss: {
+                workoutManager.info = workoutInfo
+            }) {
+                WorkoutListView(workoutSelected: $workoutInfo)
+            }
             
             Spacer()
             
@@ -48,19 +53,21 @@ struct ContentView: View {
                 }
             })
             .disabled(workoutInfo == nil)
-            .sheet(isPresented: $showDurationPicker) {
+            .sheet(isPresented: $showDurationPicker, onDismiss: {
+                workoutManager.info = workoutInfo
+            }) {
                 WorkoutDurationSelectionView(workoutInformation: $workoutInfo)
             }
             
             Spacer()
             
             NavigationLink(
-                destination: Text("Destination")) {
+                destination: WorkoutView(workoutManager: workoutManager,
+                                         watchCommunicator: watchCommunicator)) {
                 Text("Start").foregroundColor(.blue).bold()
             }
             .disabled(workoutInfo == nil)
         }
-        
     }
 }
 
