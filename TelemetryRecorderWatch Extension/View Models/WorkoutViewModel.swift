@@ -47,6 +47,7 @@ extension WorkoutView {
     func stopMotionManagerCollection() {
         motionManager.stopDeviceMotionUpdates()
         motionManager.stopAccelerometerUpdates()
+        print("stopping device motion updates: \(motionManager.isDeviceMotionActive)")
     }
 }
 

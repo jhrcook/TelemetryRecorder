@@ -22,6 +22,8 @@ extension PostWorkoutView {
             DispatchQueue.main.async { transferFileStatus = .inProgress }
             transferDataToWatch()
             DispatchQueue.main.async { transferFileStatus = .complete }
+            
+            deleteDataFileFromWatch()
         }
     }
     
@@ -29,14 +31,23 @@ extension PostWorkoutView {
     func saveDataToFile() {
         print("Saving data to file...")
         dataManager.saveDataToFile()
-        print("saved to: \(dataManager.saveFileURL)")
+        print("   done")
     }
     
     func transferDataToWatch() {
         print("Transfering data to phone...")
-        
-        // TODO
-        
-        print("Done.")
+        watchCommunicator.transferToPhone(url: dataManager.saveFileURL)
+        while watchCommunicator.numberOfOutstandingFileTransfers > 0 {
+            // Wait until transfers are complete.
+        }
+        print("   done")
+    }
+    
+    func deleteDataFileFromWatch() {
+        do {
+            try FileManager.default.removeItem(at: dataManager.saveFileURL)
+        } catch {
+            print("unable to delete data file: \(error.localizedDescription)")
+        }
     }
 }

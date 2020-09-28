@@ -49,14 +49,15 @@ struct WorkoutView: View {
         .navigationBarBackButtonHidden(true)
         .onAppear {
             startMotionManagerCollection()
-        }
-        .onAppear {
             dataManager.workoutInfo = workoutManager.info
+        }
+        .onDisappear {
+            stopMotionManagerCollection()
         }
         .sheet(isPresented: $workoutComplete, onDismiss: {
             presentationMode.wrappedValue.dismiss()
         }) {
-            PostWorkoutView(dataManager: dataManager)
+            PostWorkoutView(dataManager: dataManager, watchCommunicator: watchCommunicator)
         }
     }
 }

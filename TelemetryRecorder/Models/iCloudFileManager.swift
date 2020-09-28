@@ -14,10 +14,7 @@ class iCloudFileManager {
         return FileManager.default.url(forUbiquityContainerIdentifier: nil)?.appendingPathComponent("Documents")
     }
     
-    func testMakingFile() {
-        
-        print("Begining test of iCloud file creation.")
-        
+    func saveTransferedData(url: URL) {
         let fm = FileManager.default
         
         // check for container existence
@@ -35,19 +32,18 @@ class iCloudFileManager {
                 print("Directory already exists.")
             }
             
-            let documentURL = containerUrl.appendingPathComponent("some-text.txt")
+            let targetUrl = containerUrl.appendingPathComponent(url.lastPathComponent)
             
             do {
                 print("Trying to write text to file...")
-                let str = String("Here is some text")
-                try str.write(to: documentURL, atomically: true, encoding: .utf8)
+                try fm.copyItem(at: url, to: targetUrl)
                 print("  success")
-                print("file: \(documentURL.path)")
             } catch {
                 print("error writing file: \(error.localizedDescription)")
             }
         } else {
             print("`containerURL` is `nil`.")
         }
+        
     }
 }
