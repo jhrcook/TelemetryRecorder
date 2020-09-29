@@ -35,7 +35,7 @@ struct PostWorkoutView: View {
                     while saveFileStatus != .complete && transferFileStatus != .complete {
                         
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }

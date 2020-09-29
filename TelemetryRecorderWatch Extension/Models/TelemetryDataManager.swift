@@ -20,10 +20,21 @@ class TelemetryDataManager: ObservableObject {
     }
     
     var date = Date()
+    
+    var dateFormatter: DateFormatter {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        return df
+    }
+    
+    var formattedDate: String {
+        dateFormatter.string(from: date)
+    }
+    
     var saveFileName: String {
         let name: String = workoutInfo?.name ?? "unknown"
-        let duration = workoutInfo == nil ? "unknown" : String(workoutInfo!.duration)
-        return "workout-data_\(name)_\(duration)_\(date.description).txt"
+        let duration: String = workoutInfo == nil ? "unknown" : String(workoutInfo!.duration)
+        return "workout-data_\(name)_\(duration)_\(formattedDate).json"
     }
     
     var saveFileURL: URL {

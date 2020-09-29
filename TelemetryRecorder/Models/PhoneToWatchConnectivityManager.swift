@@ -16,7 +16,7 @@ protocol PhoneToWatchConnectivityDelegate {
 
 class PhoneToWatchConnectivityManager: NSObject, WCSessionDelegate {
     
-    private let session: WCSession
+    let session: WCSession
     
     var fileTransferDelegate: PhoneToWatchConnectivityDelegate? = nil
     

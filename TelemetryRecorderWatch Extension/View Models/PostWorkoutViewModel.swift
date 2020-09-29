@@ -29,7 +29,7 @@ extension PostWorkoutView {
     
     
     func saveDataToFile() {
-        print("Saving data to file...")
+        print("Saving data to file: \(dataManager.saveFileURL.lastPathComponent)")
         dataManager.saveDataToFile()
         print("   done")
     }

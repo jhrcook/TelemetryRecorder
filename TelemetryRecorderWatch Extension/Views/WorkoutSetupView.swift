@@ -20,10 +20,7 @@ struct WorkoutSetupView: View {
     var body: some View {
         
         VStack {
-            HStack {
-                Text("Workout").font(.footnote)
-                Spacer()
-            }
+            
             Button(action: {
                 showWorkoutList.toggle()
             }) {
@@ -35,12 +32,6 @@ struct WorkoutSetupView: View {
                 WorkoutListView(workoutSelected: $workoutInfo)
             }
             
-            Spacer()
-            
-            HStack {
-                Text("Duration").font(.footnote)
-                Spacer()
-            }
             Button(action: {
                 showDurationPicker.toggle()
             }, label: {
@@ -67,6 +58,13 @@ struct WorkoutSetupView: View {
                 Text("Start").foregroundColor(.blue).bold()
             }
             .disabled(workoutInfo == nil)
+        }
+        .onAppear {
+            workoutInfo = WorkoutChoices().workouts[0]
+            workoutManager.info = workoutInfo
+        }
+        .onDisappear {
+            print("workoutManager.info.name: \(workoutManager.info?.name ?? "nil")")
         }
     }
 }

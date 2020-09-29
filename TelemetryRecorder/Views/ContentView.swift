@@ -24,7 +24,7 @@ struct ContentView: View {
             
             Spacer()
             
-            Text("Session activation state: \(sessionActivationState.rawValue)")
+            Text("Session activation state: \(activationStateAsString(state: sessionActivationState))")
             Text("Session is paired: \(sessionIsPaired ? "True" : "False")")
             Text("Session is reachable: \(sessionIsReachable ? "True" : "False")")
             
@@ -33,6 +33,23 @@ struct ContentView: View {
             Text("Number of files received: \(numberOfFilesReceived)")
             
             Spacer()
+        }
+        .onAppear {
+            watchManager.fileTransferDelegate = self
+            watchStateDidChange(session: watchManager.session)
+        }
+    }
+    
+    func activationStateAsString(state: WCSessionActivationState) -> String {
+        switch state {
+        case .activated:
+            return "activated"
+        case .inactive:
+            return "inactive"
+        case .notActivated:
+            return "not activated"
+        default:
+            return "unknown state - update switch statement"
         }
     }
 }

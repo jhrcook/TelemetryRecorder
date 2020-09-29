@@ -50,6 +50,8 @@ struct WorkoutView: View {
         .onAppear {
             startMotionManagerCollection()
             dataManager.workoutInfo = workoutManager.info
+            print("workoutManager.info.name: \(workoutManager.info?.name ?? "nil")")
+            print("dataManager.workoutInfo.name: \(dataManager.workoutInfo?.name ?? "nil")")
         }
         .onDisappear {
             stopMotionManagerCollection()
