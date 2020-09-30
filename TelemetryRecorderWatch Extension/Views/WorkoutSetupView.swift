@@ -60,11 +60,10 @@ struct WorkoutSetupView: View {
             .disabled(workoutInfo == nil)
         }
         .onAppear {
-            workoutInfo = WorkoutChoices().workouts[0]
+            if workoutInfo == nil {
+                workoutInfo = WorkoutChoices().workouts[0]
+            }
             workoutManager.info = workoutInfo
-        }
-        .onDisappear {
-            print("workoutManager.info.name: \(workoutManager.info?.name ?? "nil")")
         }
     }
 }
