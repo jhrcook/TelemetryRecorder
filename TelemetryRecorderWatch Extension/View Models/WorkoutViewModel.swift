@@ -26,25 +26,11 @@ extension WorkoutView {
                 amountOfDataCollected = dataManager.numberOfHardwareDatapoints
             }
         }
-        
-        motionManager.startAccelerometerUpdates(to: queue) { (data: CMAccelerometerData?, error: Error?) in
-            guard let data = data else {
-                if let error = error {
-                    print("Error: \(error.localizedDescription)")
-                } else {
-                    print("Error in data collection but no error thrown.")
-                }
-                return
-            }
-            
-            dataManager.updateAccelerationData(data: data)
-        }
     }
     
     
     func stopMotionManagerCollection() {
         motionManager.stopDeviceMotionUpdates()
-        motionManager.stopAccelerometerUpdates()
     }
 }
 
@@ -54,12 +40,18 @@ extension WorkoutView {
 extension WorkoutView {
     func addMockData(N: Int = 1000) {
         DispatchQueue.global().async {
-            dataManager.hardwareData.accelX = randomDoubles(N)
-            dataManager.hardwareData.accelY = randomDoubles(N)
-            dataManager.hardwareData.accelZ = randomDoubles(N)
-            dataManager.hardwareData.pitch = randomDoubles(N)
-            dataManager.hardwareData.roll = randomDoubles(N)
-            dataManager.hardwareData.yaw = randomDoubles(N)
+            var data = [HardwareDataPoint]()
+            for _ in 0..<N {
+                let dp = HardwareDataPoint(
+                    pitch: Double.random(in: -1...1),
+                    yaw: Double.random(in: -1...1),
+                    roll: Double.random(in: -1...1),
+                    accelX: Double.random(in: -1...1),
+                    accelY: Double.random(in: -1...1),
+                    accelZ: Double.random(in: -1...1)
+                )
+                data.append(dp)
+            }
         }
         amountOfDataCollected = N
     }
