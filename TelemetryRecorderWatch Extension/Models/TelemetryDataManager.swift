@@ -15,7 +15,7 @@ class TelemetryDataManager: ObservableObject {
     
     var numberOfHardwareDatapoints: Int {
         get {
-            hardwareData.pitch.count
+            hardwareData.data.count
         }
     }
     
@@ -41,19 +41,17 @@ class TelemetryDataManager: ObservableObject {
         getDocumentsDirectory().appendingPathComponent(saveFileName)
     }
     
+    
     func updateMotionData(data: CMDeviceMotion) {
         let attitude: CMAttitude = data.attitude
-        hardwareData.pitch.append(attitude.pitch)
-        hardwareData.yaw.append(attitude.yaw)
-        hardwareData.roll.append(attitude.roll)
+        let acceleration: CMAcceleration = data.userAcceleration
+        let dataPoint = HardwareDataPoint(
+            pitch: attitude.pitch, yaw: attitude.yaw, roll: attitude.roll,
+            accelX: acceleration.x, accelY: acceleration.y, accelZ: acceleration.z
+        )
+        hardwareData.data.append(dataPoint)
     }
     
-    func updateAccelerationData(data: CMAccelerometerData) {
-        let acceleration = data.acceleration
-        hardwareData.accelX.append(acceleration.x)
-        hardwareData.accelY.append(acceleration.y)
-        hardwareData.accelZ.append(acceleration.z)
-    }
     
     func saveDataToFile() {
         let data = hardwareData.dataAsDictionary()
@@ -66,33 +64,44 @@ class TelemetryDataManager: ObservableObject {
             print("erorr encoding/writing data: \(error.localizedDescription)")
         }
     }
+    
+    
+    func reset() {
+        hardwareData.data = []
+        workoutInfo = nil
+        date = Date()
+    }
 }
 
 
 
 class HardwareData {
-    // Attitude
-    var pitch = [Double]()
-    var yaw = [Double]()
-    var roll = [Double]()
     
-    // Acceleration
-    var accelX = [Double]()
-    var accelY = [Double]()
-    var accelZ = [Double]()
+    var data = [HardwareDataPoint]()
     
     func dataAsDictionary() -> [String: [String: [Double]]] {
+        
         return [
             "attitude": [
-                "pitch": pitch,
-                "yaw": yaw,
-                "roll": roll
+                "pitch": data.map({ $0.pitch }),
+                "yaw": data.map({ $0.yaw }),
+                "roll": data.map({ $0.roll })
             ],
             "acceleration": [
-                "x": accelX,
-                "y": accelY,
-                "z": accelZ
+                "x": data.map({ $0.accelX }),
+                "y": data.map({ $0.accelY }),
+                "z": data.map({ $0.accelZ })
             ]
         ]
     }
+}
+
+
+struct HardwareDataPoint {
+    var pitch: Double
+    var yaw: Double
+    var roll: Double
+    var accelX: Double
+    var accelY: Double
+    var accelZ: Double
 }
