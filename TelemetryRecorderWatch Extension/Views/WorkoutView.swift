@@ -33,9 +33,18 @@ struct WorkoutView: View {
             Text("Number of telemetry data points")
                 .multilineTextAlignment(.center)
                 .padding(.vertical, 5)
-            Text("\(amountOfDataCollected)")
-                .font(.title)
-                .foregroundColor(.green)
+            
+            ZStack {
+                if (workoutComplete) {
+                    Text("--")
+                        .font(.title)
+                        .foregroundColor(.green)
+                } else {
+                    Text("\(amountOfDataCollected)")
+                        .font(.title)
+                        .foregroundColor(.green)
+                }
+            }
             
             Spacer()
             
@@ -48,15 +57,21 @@ struct WorkoutView: View {
         }
         .navigationBarBackButtonHidden(true)
         .onAppear {
-            startMotionManagerCollection()
+            if workoutComplete {
+                dataManager.reset()
+            } else {
+                dataManager.reset()
+                dataManager.workoutInfo = workoutManager.info
+                startMotionManagerCollection()
+            }
         }
-        .onAppear {
-            dataManager.workoutInfo = workoutManager.info
+        .onDisappear {
+            stopMotionManagerCollection()
         }
         .sheet(isPresented: $workoutComplete, onDismiss: {
             presentationMode.wrappedValue.dismiss()
         }) {
-            PostWorkoutView(dataManager: dataManager)
+            PostWorkoutView(dataManager: dataManager, watchCommunicator: watchCommunicator)
         }
     }
 }

@@ -8,11 +8,10 @@
 import SwiftUI
 
 
-
-
 struct PostWorkoutView: View {
     
     var dataManager: TelemetryDataManager
+    var watchCommunicator: WatchConnectivityManager
     
     @Environment(\.presentationMode) var presentationMode
     @State var saveFileStatus: TaskStatus = .incomplete
@@ -32,11 +31,19 @@ struct PostWorkoutView: View {
             
             Button(action: {
                 saveAndSyncData()
-                presentationMode.wrappedValue.dismiss()
-            }, label: {
+                DispatchQueue.global(qos: .userInitiated).async {
+                    while saveFileStatus != .complete && transferFileStatus != .complete {
+                        
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        presentationMode.wrappedValue.dismiss()
+                    }
+                }
+            }) {
                 Text("Save data")
-            })
+            }
             Button(action: {
+                watchCommunicator.cancelAllFileTransfers()
                 presentationMode.wrappedValue.dismiss()
             }, label: {
                 Text("Cancel")
@@ -48,6 +55,6 @@ struct PostWorkoutView: View {
 
 struct PostWorkoutView_Previews: PreviewProvider {
     static var previews: some View {
-        PostWorkoutView(dataManager: TelemetryDataManager())
+        PostWorkoutView(dataManager: TelemetryDataManager(), watchCommunicator: WatchConnectivityManager())
     }
 }
