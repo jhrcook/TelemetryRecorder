@@ -10,3 +10,17 @@
 
 This application is used purely for data collection for external analysis.
 It will be used to help inform my other Watch app [Workout Spinner](https://github.com/jhrcook/Workout-Spinner-watchapp).
+
+---
+
+## Status
+
+### Apps
+
+The Apple Watch and iOS apps are built and running successfully.
+The next step is to add Workout Sessions to access more data and unique background privileges.
+
+### Data Analysis
+
+Some preliminary data has been collected and exploration of model fitting has begun.
+More on the data analysis can be found [here](TelemetryDataAnalysis/).
