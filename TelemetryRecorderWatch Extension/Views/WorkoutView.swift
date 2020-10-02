@@ -22,7 +22,7 @@ struct WorkoutView: View {
     @State var amountOfDataCollected: Int = 0
     
     @State private var workoutComplete = false
-    @State var dataTransferComplete = false
+    @State private var presentTransferSheet = false
     
     @Environment(\.presentationMode) var presentationMode
     
@@ -32,7 +32,7 @@ struct WorkoutView: View {
             
             Text("Number of telemetry data points")
                 .multilineTextAlignment(.center)
-                .padding(.vertical, 5)
+                .padding(.bottom, 5)
             
             ZStack {
                 if (workoutComplete) {
@@ -45,30 +45,45 @@ struct WorkoutView: View {
                         .foregroundColor(.green)
                 }
             }
+            .padding(.bottom, 5)
+            
+            HStack {
+                Spacer()
+                Image(systemName: "heart.circle")
+                    .font(.headline)
+                    .foregroundColor(.red)
+                Text("HR: ")
+                    .foregroundColor(.white)
+                    .font(.headline)
+                Text(String(format: "%.1f", workoutManager.heartrate))
+                    .font(.headline)
+                    .bold()
+                    .foregroundColor(.red)
+                Spacer()
+            }
             
             Spacer()
             
             Button(action: {
+                workoutManager.endWorkout()
                 stopMotionManagerCollection()
-                workoutComplete.toggle()
+                workoutComplete = true
+                presentTransferSheet = true
             }) {
                 Text("Done")
             }
         }
         .navigationBarBackButtonHidden(true)
         .onAppear {
-            if workoutComplete {
-                dataManager.reset()
-            } else {
-                dataManager.reset()
+            dataManager.reset()
+            if !workoutComplete {
+                print("Starting workout!")
                 dataManager.workoutInfo = workoutManager.info
+                workoutManager.startWorkout()
                 startMotionManagerCollection()
             }
         }
-        .onDisappear {
-            stopMotionManagerCollection()
-        }
-        .sheet(isPresented: $workoutComplete, onDismiss: {
+        .sheet(isPresented: $presentTransferSheet, onDismiss: {
             presentationMode.wrappedValue.dismiss()
         }) {
             PostWorkoutView(dataManager: dataManager, watchCommunicator: watchCommunicator)

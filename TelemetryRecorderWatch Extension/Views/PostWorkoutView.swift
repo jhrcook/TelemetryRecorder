@@ -42,6 +42,7 @@ struct PostWorkoutView: View {
             }) {
                 Text("Save data")
             }
+            
             Button(action: {
                 watchCommunicator.cancelAllFileTransfers()
                 presentationMode.wrappedValue.dismiss()
