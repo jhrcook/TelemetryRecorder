@@ -60,6 +60,7 @@ struct WorkoutSetupView: View {
             .disabled(workoutInfo == nil)
         }
         .onAppear {
+            workoutManager.requestAuthorization()
             if workoutInfo == nil {
                 workoutInfo = WorkoutChoices().workouts[0]
             }

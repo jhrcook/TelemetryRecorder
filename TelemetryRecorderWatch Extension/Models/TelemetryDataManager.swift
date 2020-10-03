@@ -8,100 +8,59 @@
 import Foundation
 import CoreMotion
 
+
+struct TelemetryDataPoint: Codable {
+    let date: Date
+    let pitch: Double
+    let yaw: Double
+    let roll: Double
+    let accelX: Double
+    let accelY: Double
+    let accelZ: Double
+}
+
+
 class TelemetryDataManager: ObservableObject {
     
+    /// - Tag: Data
     var workoutInfo: WorkoutInformation? = nil
-    var hardwareData = HardwareData()
+    var telemetryData = [TelemetryDataPoint]()
     
-    var numberOfHardwareDatapoints: Int {
+    var numberOfTelemetryDataPoints: Int {
         get {
-            hardwareData.data.count
+            telemetryData.count
         }
     }
     
-    var date = Date()
     
-    var dateFormatter: DateFormatter {
-        let df = DateFormatter()
-        df.dateFormat = "yyyy-MM-dd_HH-mm-ss"
-        return df
-    }
-    
-    var formattedDate: String {
-        dateFormatter.string(from: date)
-    }
-    
-    var saveFileName: String {
-        let name: String = workoutInfo?.name ?? "unknown"
-        let duration: String = workoutInfo == nil ? "unknown" : String(workoutInfo!.duration)
-        return "workout-data_\(name)_\(duration)_\(formattedDate).json"
-    }
-    
-    var saveFileURL: URL {
-        getDocumentsDirectory().appendingPathComponent(saveFileName)
-    }
-    
-    
-    func updateMotionData(data: CMDeviceMotion) {
+    /// Update the motion data.
+    /// - Parameters:
+    ///   - data: Device motion data from `CoreMotion`.
+    ///   - date: When the data was collected.
+    func updateMotionData(data: CMDeviceMotion, at date: Date) {
         let attitude: CMAttitude = data.attitude
         let acceleration: CMAcceleration = data.userAcceleration
-        let dataPoint = HardwareDataPoint(
+        let dataPoint = TelemetryDataPoint(
+            date: date,
             pitch: attitude.pitch, yaw: attitude.yaw, roll: attitude.roll,
             accelX: acceleration.x, accelY: acceleration.y, accelZ: acceleration.z
         )
-        hardwareData.data.append(dataPoint)
+        addDataPoint(dataPoint)
     }
     
     
-    func saveDataToFile() {
-        let data = hardwareData.dataAsDictionary()
-        let encoder = JSONEncoder()
-        
-        do {
-            let jsonData = try encoder.encode(data)
-            try jsonData.write(to: saveFileURL)
-        } catch {
-            print("erorr encoding/writing data: \(error.localizedDescription)")
-        }
-    }
-    
-    
+    /// Reset the data.
+    ///
+    /// Sets the workout info to `nil` and data array is emptied.
     func reset() {
-        hardwareData.data = []
+        telemetryData = []
         workoutInfo = nil
-        date = Date()
     }
-}
-
-
-
-class HardwareData {
     
-    var data = [HardwareDataPoint]()
     
-    func dataAsDictionary() -> [String: [String: [Double]]] {
-        
-        return [
-            "attitude": [
-                "pitch": data.map({ $0.pitch }),
-                "yaw": data.map({ $0.yaw }),
-                "roll": data.map({ $0.roll })
-            ],
-            "acceleration": [
-                "x": data.map({ $0.accelX }),
-                "y": data.map({ $0.accelY }),
-                "z": data.map({ $0.accelZ })
-            ]
-        ]
+    /// Add a data point to the telemetry data array.
+    /// - Parameter newDataPoint: The new data point.
+    func addDataPoint(_ newDataPoint: TelemetryDataPoint) {
+        telemetryData.append(newDataPoint)
     }
-}
-
-
-struct HardwareDataPoint {
-    var pitch: Double
-    var yaw: Double
-    var roll: Double
-    var accelX: Double
-    var accelY: Double
-    var accelZ: Double
 }

@@ -9,20 +9,35 @@ import SwiftUI
 import CoreMotion
 
 
+struct ImageAndCounter: View {
+    
+    let imageSystemName: String
+    var counterValue: Int
+    
+    var body: some View {
+        HStack {
+            Image(systemName: imageSystemName)
+            Text(": \(counterValue)")
+                .foregroundColor(.green)
+                .bold()
+        }
+    }
+}
+
+
 struct WorkoutView: View {
     
     @ObservedObject var workoutManager: WorkoutManager
     var watchCommunicator: WatchConnectivityManager
-    
-    var dataManager = TelemetryDataManager()
+    var telemetryDataManager = TelemetryDataManager()
     
     let motionManager = CMMotionManager()
     let queue = OperationQueue()
     
     @State var amountOfDataCollected: Int = 0
     
-    @State private var workoutComplete = false
-    @State var dataTransferComplete = false
+    @State internal var workoutComplete = false
+    @State internal var presentTransferSheet = false
     
     @Environment(\.presentationMode) var presentationMode
     
@@ -30,48 +45,43 @@ struct WorkoutView: View {
         VStack {
             Spacer()
             
-            Text("Number of telemetry data points")
-                .multilineTextAlignment(.center)
-                .padding(.vertical, 5)
+            HStack {
+                Spacer()
+                ImageAndCounter(imageSystemName: "hand.raised",
+                                counterValue: amountOfDataCollected)
+                Spacer()
+                ImageAndCounter(imageSystemName: "waveform.path.ecg",
+                                counterValue: workoutManager.numberOfWorkoutDataPoints)
+                Spacer()
+            }
+            .padding(.bottom, 5)
             
-            ZStack {
-                if (workoutComplete) {
-                    Text("--")
-                        .font(.title)
-                        .foregroundColor(.green)
-                } else {
-                    Text("\(amountOfDataCollected)")
-                        .font(.title)
-                        .foregroundColor(.green)
-                }
+            HStack {
+                Spacer()
+                Image(systemName: "heart.circle")
+                    .foregroundColor(.red)
+                Text("HR: ")
+                Text("\(Int(workoutManager.heartrate))")
+                    .bold()
+                    .foregroundColor(.red)
+                Spacer()
             }
             
             Spacer()
             
-            Button(action: {
-                stopMotionManagerCollection()
-                workoutComplete.toggle()
-            }) {
+            Button(action: stopMotionManagerCollection) {
                 Text("Done")
             }
         }
         .navigationBarBackButtonHidden(true)
-        .onAppear {
-            if workoutComplete {
-                dataManager.reset()
-            } else {
-                dataManager.reset()
-                dataManager.workoutInfo = workoutManager.info
-                startMotionManagerCollection()
-            }
-        }
-        .onDisappear {
-            stopMotionManagerCollection()
-        }
-        .sheet(isPresented: $workoutComplete, onDismiss: {
+        .onAppear(perform: viewIsAppearing)
+        .sheet(isPresented: $presentTransferSheet, onDismiss: {
             presentationMode.wrappedValue.dismiss()
         }) {
-            PostWorkoutView(dataManager: dataManager, watchCommunicator: watchCommunicator)
+            PostWorkoutView(dataSaver: DataSaver(workoutInfo: workoutManager.info,
+                                                 telemetryData: telemetryDataManager,
+                                                 workoutData: workoutManager),
+                            watchCommunicator: watchCommunicator)
         }
     }
 }
