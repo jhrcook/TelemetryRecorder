@@ -3,25 +3,51 @@
 source("start.R")
 
 
-#### ---- Data preparation ---- ####
+#### ---- Data prepration ---- ####
 
-telemetry_json_to_tibble <- function(j) {
-  enframe(j, name = "motion_type", value = "data") %.% {
-    mutate(data = map(data, ~ enframe(.x, name = "axis", value = "data")))
-    unnest(data)
-    unnest(data)
-    group_by(motion_type, axis)
+get_data_file_names <- function(dir) {
+  list.files(dir, pattern = "json$", full.names = TRUE)
+}
+
+
+telemetry_json_to_dataframe <- function(j) {
+  map_dfr(j$telemetryData, as_tibble) %.% {
     mutate(idx = row_number())
-    ungroup()
-    arrange(motion_type, axis)
-    mutate(axis = fct_inorder(axis))
+    janitor::clean_names()
+    pivot_longer(
+      -c(idx, date),
+      names_to = "axis",
+      values_to = "value"
+    )
   }
 }
 
-read_telemetry_data_file <- function(f) {
-  j <- rjson::fromJSON(file = f)
-  telemetry_json_to_tibble(j)
+
+workout_json_to_dataframe <- function(j) {
+  
+  d <- j$workoutData
+  if (length(d) == 0) {
+    return(tibble())
+  }
+  
+  map_dfr(d, as_tibble) %.% {
+    janitor::clean_names()
+    mutate(
+      date = as.numeric(date),
+      value = as.numeric(value),
+      quantity_type = str_remove(quantity_type, "HKQuantityTypeIdentifier")
+    )
+    group_by(quantity_type)
+    mutate(scaled_value = scales::rescale_max(value))
+    ungroup()
+  }
 }
+
+
+read_telemetry_data_file <- function(f) {
+  rjson::fromJSON(file = f)
+}
+
 
 parse_data_file_name <- function(fn) {
   fn_base <- tools::file_path_sans_ext(basename(fn))
@@ -33,67 +59,80 @@ parse_data_file_name <- function(fn) {
   )
 }
 
-prep_telemtry_data_file <- function(f) {
-  meta_data <- parse_data_file_name(f)
-  meta_data$data <- list(read_telemetry_data_file(f))
-  return(meta_data)
+
+
+read_watch_data <- function(fn) {
+  j <- read_telemetry_data_file(fn)
+  
+  telemetry_data <- telemetry_json_to_dataframe(j)
+  workout_data <- workout_json_to_dataframe(j)
+  
+  start_date <- min(c(telemetry_data$date, workout_data$date))
+  telemetry_data$date <- telemetry_data$date - start_date
+  workout_data$date <- workout_data$date - start_date
+  
+  return(list(
+    meta_data = parse_data_file_name(fn),
+    telemetry_data = telemetry_data,
+    workout_data = workout_data
+  ))
 }
 
-get_data_file_names <- function(dir) {
-  list.files(dir, pattern = "json$", full.names = TRUE)
-}
 
 #### ---- Plotting ---- ####
 
 line_plot_telemetry <- function(df) {
   df %>%
-    ggplot(aes(idx, data)) +
-    facet_wrap(~ motion_type, ncol = 1, scales = "free_y") +
+    ggplot(aes(idx, value)) +
+    facet_wrap(~axis, ncol = 1, scales = "free_y") +
     geom_line(aes(color = axis))
 }
 
 
 
 all_data_files <- get_data_file_names(data_dir)
-raw_pushup_data <- prep_telemtry_data_file(all_data_files[2]) %>%
-  unnest(data)
+raw_pushup_data <- read_watch_data(all_data_files[2])
 
-line_plot_telemetry(raw_pushup_data)
-  
+raw_pushup_telemetry_data <- raw_pushup_data$telemetry_data
 
-pushup_data <- raw_pushup_data %>%
-  filter(between(idx, 350, 625))
-line_plot_telemetry(pushup_data)
+line_plot_telemetry(raw_pushup_telemetry_data)
 
 
-#### ---- HMM ---- ####
+clean_pushup_data <- raw_pushup_telemetry_data %>%
+  filter(between(idx, 250, 1400))
+line_plot_telemetry(clean_pushup_data)
+
+
+#### ---- Hidden Markov Modeling ---- ####
 
 library(depmixS4)
 set.seed(0)
 
-pushup_data_wide <- pushup_data %.% {
-  mutate(motion = glue("{motion_type}_{axis}"))
-  pivot_wider(
-    c(exercise, reps, date, idx), 
-    names_from = motion,
-    values_from = data
-  )
+pivot_telemetry_data <- function(telemetry_data) {
+  telemetry_data %>%
+    pivot_wider(
+      c(date, idx),
+      names_from = axis,
+      values_from = value
+    )
 }
 
+pushup_data_wide <- pivot_telemetry_data(clean_pushup_data)
 
-contruct_full_telemetry_hmm_model <- function(d, nstates) {
+
+construct_full_telemetry_hmm_model <- function(d, nstates) {
   depmix(
     list(
-      acceleration_x ~ 1,
-      acceleration_y ~ 1,
-      acceleration_z ~ 1,
-      attitude_pitch ~ 1,
-      attitude_roll ~ 1,
-      attitude_yaw ~ 1
+      accel_x ~ 1,
+      accel_y ~ 1,
+      accel_z ~ 1,
+      pitch ~ 1,
+      roll ~ 1,
+      yaw ~ 1
     ),
     nstates = nstates,
     family = list(
-      gaussian(), gaussian(), gaussian(), 
+      gaussian(), gaussian(), gaussian(),
       gaussian(), gaussian(), gaussian()
     ),
     data = d
@@ -101,12 +140,12 @@ contruct_full_telemetry_hmm_model <- function(d, nstates) {
 }
 
 
-contruct_accell_telemetry_hmm_model <- function(d, nstates) {
+construct_accel_telemetry_hmm_model <- function(d, nstates) {
   depmix(
     list(
-      acceleration_x ~ 1,
-      acceleration_y ~ 1,
-      acceleration_z ~ 1
+      accel_x ~ 1,
+      accel_y ~ 1,
+      accel_z ~ 1
     ),
     nstates = nstates,
     family = list(gaussian(), gaussian(), gaussian()),
@@ -115,12 +154,12 @@ contruct_accell_telemetry_hmm_model <- function(d, nstates) {
 }
 
 
-contruct_attitude_telemetry_hmm_model <- function(d, nstates) {
+construct_attitude_telemetry_hmm_model <- function(d, nstates) {
   depmix(
     list(
-      attitude_pitch ~ 1,
-      attitude_roll ~ 1,
-      attitude_yaw ~ 1
+      pitch ~ 1,
+      roll ~ 1,
+      yaw ~ 1
     ),
     nstates = nstates,
     family = list(gaussian(), gaussian(), gaussian()),
@@ -129,14 +168,14 @@ contruct_attitude_telemetry_hmm_model <- function(d, nstates) {
 }
 
 
-m2_full <- contruct_full_telemetry_hmm_model(pushup_data_wide, 2)
-m3_full <- contruct_full_telemetry_hmm_model(pushup_data_wide, 3)
+m2_full <- construct_full_telemetry_hmm_model(pushup_data_wide, 2)
+m3_full <- construct_full_telemetry_hmm_model(pushup_data_wide, 3)
 
-m2_accel <- contruct_accell_telemetry_hmm_model(pushup_data_wide, 2)
-m3_accel <- contruct_accell_telemetry_hmm_model(pushup_data_wide, 3)
+m2_accel <- construct_accel_telemetry_hmm_model(pushup_data_wide, 2)
+m3_accel <- construct_accel_telemetry_hmm_model(pushup_data_wide, 3)
 
-m2_att <- contruct_attitude_telemetry_hmm_model(pushup_data_wide, 2)
-m3_att <- contruct_attitude_telemetry_hmm_model(pushup_data_wide, 3)
+m2_att <- construct_attitude_telemetry_hmm_model(pushup_data_wide, 2)
+m3_att <- construct_attitude_telemetry_hmm_model(pushup_data_wide, 3)
 
 
 m2_full_fit <- fit(m2_full)
@@ -147,13 +186,13 @@ m2_att_fit <- fit(m2_att)
 m3_att_fit <- fit(m3_att)
 
 AIC(
-  m2_full_fit, m3_full_fit, 
-  m2_accel_fit, m3_accel_fit, 
+  m2_full_fit, m3_full_fit,
+  m2_accel_fit, m3_accel_fit,
   m2_att_fit, m3_att_fit
 )
 BIC(
-  m2_full_fit, m3_full_fit, 
-  m2_accel_fit, m3_accel_fit, 
+  m2_full_fit, m3_full_fit,
+  m2_accel_fit, m3_accel_fit,
   m2_att_fit, m3_att_fit
 )
 
@@ -167,22 +206,26 @@ hmm_states_p <- posterior(m2_full_fit) %>%
   theme(
     plot.title = element_text(hjust = 0.5, size = 11, face = "bold")
   ) +
-  labs(x = "data point",
-       y = "probability of state",
-       color = "state",
-       title = "Hidden Markov Model")
+  labs(
+    x = "data point",
+    y = "probability of state",
+    color = "state",
+    title = "Hidden Markov Model"
+  )
 
-data_p <- pushup_data %>%
-  mutate(motion_type = str_to_title(motion_type)) %>%
+data_p <- clean_pushup_data %>%
+  mutate(motion_type = str_to_title(axis)) %>%
   line_plot_telemetry() +
-  labs(x = NULL,
-       y = "value") +
+  labs(
+    x = NULL,
+    y = "value"
+  ) +
   theme(
     strip.text = element_text(size = 11, face = "bold")
   )
 
 patch <- data_p / hmm_states_p +
-  plot_layout(heights = c(2, 1))
+  plot_layout(heights = c(4, 1))
 
 ggsave(
   file.path("graphs", "pushup-hmm.png"),
@@ -190,3 +233,91 @@ ggsave(
   width = 8, height = 5, unit = "in",
   dpi = 500
 )
+
+
+
+
+
+
+raw_pushup_wide <- pivot_telemetry_data(raw_pushup_telemetry_data)
+
+m2_full_raw <- construct_full_telemetry_hmm_model(
+  d = raw_pushup_wide,
+  nstates = 2
+)
+m2_full_raw_fit <- fit(m2_full_raw)
+
+m3_full_raw <- construct_full_telemetry_hmm_model(
+  d = raw_pushup_wide,
+  nstates = 3
+)
+m3_full_raw_fit <- fit(m3_full_raw)
+
+m4_full_raw <- construct_full_telemetry_hmm_model(
+  d = raw_pushup_wide,
+  nstates = 4
+)
+m4_full_raw_fit <- fit(m4_full_raw)
+
+m5_full_raw <- construct_full_telemetry_hmm_model(
+  d = raw_pushup_wide,
+  nstates = 5
+)
+m5_full_raw_fit <- fit(m5_full_raw)
+
+AIC(
+  m2_full_raw_fit, m3_full_raw_fit, 
+  m4_full_raw_fit, m5_full_raw_fit
+)
+
+BIC(
+  m2_full_raw_fit, m3_full_raw_fit, 
+  m4_full_raw_fit, m5_full_raw_fit
+)
+
+
+
+hmm_states_p <- posterior(m4_full_raw_fit) %>%
+  as_tibble() %>%
+  mutate(idx = row_number()) %>%
+  pivot_longer(-c(idx, state)) %>%
+  ggplot(aes(x = idx, y = value, color = name)) +
+  facet_wrap(~ name, ncol = 1) +
+  geom_line(size = 2, alpha = 0.8) +
+  scale_color_brewer(type = "qual", palette = "Set1") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 11, face = "bold")
+  ) +
+  labs(
+    x = "data point",
+    y = "probability of state",
+    color = "state",
+    title = "Hidden Markov Model states"
+  )
+
+data_p <- raw_pushup_telemetry_data %>%
+  mutate(motion_type = str_to_title(axis)) %>%
+  line_plot_telemetry() +
+  labs(
+    x = NULL,
+    y = "value"
+  ) +
+  theme(
+    strip.text = element_text(size = 11, face = "bold")
+  )
+
+patch <- data_p / hmm_states_p +
+  plot_layout(heights = c(6, 4))
+patch
+
+
+
+
+# TO TRY: 
+# - smooth data
+# - scale data to be Gaussian
+
+
+# TODO:
+# - tidy up this script
+# - move to a R Markdown so that the results can be seen on GitHub.
