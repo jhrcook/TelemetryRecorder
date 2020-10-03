@@ -21,7 +21,7 @@ extension WorkoutView {
                 return
             }
             
-            dataManager.updateMotionData(data: data)
+            dataManager.updateMotionData(data: data, at: Date())
             DispatchQueue.main.async {
                 amountOfDataCollected = dataManager.numberOfHardwareDataPoints
             }
@@ -31,33 +31,5 @@ extension WorkoutView {
     
     func stopMotionManagerCollection() {
         motionManager.stopDeviceMotionUpdates()
-    }
-}
-
-
-// MARK: - Mock data
-
-extension WorkoutView {
-    func addMockData(N: Int = 1000) {
-        DispatchQueue.global().async {
-            var data = [HardwareDataPoint]()
-            for _ in 0..<N {
-                let dp = HardwareDataPoint(
-                    pitch: Double.random(in: -1...1),
-                    yaw: Double.random(in: -1...1),
-                    roll: Double.random(in: -1...1),
-                    accelX: Double.random(in: -1...1),
-                    accelY: Double.random(in: -1...1),
-                    accelZ: Double.random(in: -1...1)
-                )
-                data.append(dp)
-            }
-        }
-        amountOfDataCollected = N
-    }
-    
-    
-    func randomDoubles(_ n: Int, range: ClosedRange<Double> = -1.0...1.0) -> [Double] {
-        return (0..<n).map {_ in Double.random(in: range) }
     }
 }

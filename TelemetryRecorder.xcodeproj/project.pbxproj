@@ -10,6 +10,8 @@
 		840820422520B4D7001E434C /* WorkoutViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840820412520B4D7001E434C /* WorkoutViewModel.swift */; };
 		840820482520B85B001E434C /* TaskCheckView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 840820472520B85B001E434C /* TaskCheckView.swift */; };
 		84758ADB25289F9300D31B32 /* HealthKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 84758ADA25289F9300D31B32 /* HealthKit.framework */; };
+		84758AE32528B63600D31B32 /* DataSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84758AE22528B63600D31B32 /* DataSaver.swift */; };
+		84758AEF2528BEF500D31B32 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84758AEE2528BEF500D31B32 /* Extensions.swift */; };
 		848393DA251F60110063125D /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848393D9251F60110063125D /* AppDelegate.swift */; };
 		848393DC251F60110063125D /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848393DB251F60110063125D /* SceneDelegate.swift */; };
 		848393DE251F60110063125D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 848393DD251F60110063125D /* ContentView.swift */; };
@@ -91,6 +93,8 @@
 		840820412520B4D7001E434C /* WorkoutViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViewModel.swift; sourceTree = "<group>"; };
 		840820472520B85B001E434C /* TaskCheckView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskCheckView.swift; sourceTree = "<group>"; };
 		84758ADA25289F9300D31B32 /* HealthKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = HealthKit.framework; path = System/Library/Frameworks/HealthKit.framework; sourceTree = SDKROOT; };
+		84758AE22528B63600D31B32 /* DataSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSaver.swift; sourceTree = "<group>"; };
+		84758AEE2528BEF500D31B32 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		848393D6251F60110063125D /* TelemetryRecorder.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TelemetryRecorder.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		848393D9251F60110063125D /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		848393DB251F60110063125D /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -159,6 +163,14 @@
 			path = Subviews;
 			sourceTree = "<group>";
 		};
+		84758AED2528BEE300D31B32 /* General */ = {
+			isa = PBXGroup;
+			children = (
+				84758AEE2528BEF500D31B32 /* Extensions.swift */,
+			);
+			path = General;
+			sourceTree = "<group>";
+		};
 		848393CD251F60110063125D = {
 			isa = PBXGroup;
 			children = (
@@ -219,6 +231,7 @@
 			isa = PBXGroup;
 			children = (
 				84C7429A25273FB700EF568A /* TelemetryRecorderWatch Extension.entitlements */,
+				84758AED2528BEE300D31B32 /* General */,
 				840820462520B84D001E434C /* Subviews */,
 				84839427251F65290063125D /* Views */,
 				84839426251F651B0063125D /* View Models */,
@@ -245,11 +258,12 @@
 			isa = PBXGroup;
 			children = (
 				84839428251F654F0063125D /* WorkoutManager.swift */,
+				8483943F251F65780063125D /* TelemetryDataManager.swift */,
 				84839430251F655A0063125D /* WorkoutInformation.swift */,
 				84839435251F65630063125D /* WorkoutChoices.swift */,
 				8483943A251F65710063125D /* Exercise-enums.swift */,
-				8483943F251F65780063125D /* TelemetryDataManager.swift */,
 				84DB769C251F9CF70090CBBF /* WatchConnectivityManager.swift */,
+				84758AE22528B63600D31B32 /* DataSaver.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -524,9 +538,11 @@
 				84839431251F655A0063125D /* WorkoutInformation.swift in Sources */,
 				8483944A251F65C90063125D /* WorkoutDurationSelectionView.swift in Sources */,
 				84839429251F654F0063125D /* WorkoutManager.swift in Sources */,
+				84758AE32528B63600D31B32 /* DataSaver.swift in Sources */,
 				84DB769D251F9CF70090CBBF /* WatchConnectivityManager.swift in Sources */,
 				840820422520B4D7001E434C /* WorkoutViewModel.swift in Sources */,
 				84FAC62E2521E47600B79BDA /* WorkoutSetupView.swift in Sources */,
+				84758AEF2528BEF500D31B32 /* Extensions.swift in Sources */,
 				84839459251F65F40063125D /* PostWorkoutView.swift in Sources */,
 				84839440251F65780063125D /* TelemetryDataManager.swift in Sources */,
 				8483943B251F65710063125D /* Exercise-enums.swift in Sources */,

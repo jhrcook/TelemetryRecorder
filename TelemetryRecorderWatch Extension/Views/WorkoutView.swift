@@ -83,7 +83,10 @@ struct WorkoutView: View {
         .sheet(isPresented: $presentTransferSheet, onDismiss: {
             presentationMode.wrappedValue.dismiss()
         }) {
-            PostWorkoutView(dataManager: dataManager, watchCommunicator: watchCommunicator)
+            PostWorkoutView(dataSaver: DataSaver(workoutInfo: workoutManager.info,
+                                                 telemetryData: dataManager.hardwareData,
+                                                 workoutData: workoutManager.workoutData),
+                            watchCommunicator: watchCommunicator)
         }
     }
 }

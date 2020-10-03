@@ -252,6 +252,7 @@ extension WorkoutManager {
 
 
 class WorkoutData {
+    
     var data = [WorkoutDataPoint]()
     
     func append(_ newDataPoint: WorkoutDataPoint) {
@@ -269,7 +270,7 @@ class WorkoutData {
         return [
             "quantityType": data.map { $0.quantityType.rawValue },
             "value": data.map { String($0.value) },
-            "date": data.map { dateFormatter.string(from: $0.date) }
+            "date": data.map { String($0.date.timeIntervalSince1970) }
         ]
     }
     

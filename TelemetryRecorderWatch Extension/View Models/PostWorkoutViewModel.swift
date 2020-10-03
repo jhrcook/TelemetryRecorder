@@ -28,14 +28,14 @@ extension PostWorkoutView {
     
     
     func saveDataToFile() {
-        print("Saving data to file: \(dataManager.saveFileURL.lastPathComponent)")
-        dataManager.saveDataToFile()
+        print("Saving data to file: \(dataSaver.saveFileURL.lastPathComponent)")
+        dataSaver.saveDataToFile()
         print("   done")
     }
     
     func transferDataToWatch() {
         print("Transfering data to phone...")
-        watchCommunicator.transferToPhone(url: dataManager.saveFileURL)
+        watchCommunicator.transferToPhone(url: dataSaver.saveFileURL)
         while watchCommunicator.numberOfOutstandingFileTransfers > 0 {
             // Wait until transfers are complete.
         }
@@ -44,7 +44,7 @@ extension PostWorkoutView {
     
     func deleteDataFileFromWatch() {
         do {
-            try FileManager.default.removeItem(at: dataManager.saveFileURL)
+            try FileManager.default.removeItem(at: dataSaver.saveFileURL)
         } catch {
             print("unable to delete data file: \(error.localizedDescription)")
         }

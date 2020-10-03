@@ -10,7 +10,7 @@ import SwiftUI
 
 struct PostWorkoutView: View {
     
-    var dataManager: TelemetryDataManager
+    var dataSaver: DataSaver
     var watchCommunicator: WatchConnectivityManager
     
     @Environment(\.presentationMode) var presentationMode
@@ -56,6 +56,6 @@ struct PostWorkoutView: View {
 
 struct PostWorkoutView_Previews: PreviewProvider {
     static var previews: some View {
-        PostWorkoutView(dataManager: TelemetryDataManager(), watchCommunicator: WatchConnectivityManager())
+        PostWorkoutView(dataSaver: DataSaver(), watchCommunicator: WatchConnectivityManager())
     }
 }
