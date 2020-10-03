@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
-	<string>75</string>
+	<string>86</string>
 	<key>CLKComplicationPrincipalClass</key>
 	<string>$(PRODUCT_MODULE_NAME).ComplicationController</string>
 	<key>NSExtension</key>
@@ -35,7 +35,7 @@
 	<key>NSHealthShareUsageDescription</key>
 	<string>Your workout related data will be recorded to iCloud Drive for your own personal use.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Workouts tracked by SpeedySloth on Apple Watch will be saved to HealthKit.</string>
+	<string>Workouts tracked by TelemetryRecorder on Apple Watch will not be saved to HealthKit.</string>
 	<key>UIBackgroundModes</key>
 	<array/>
 	<key>WKBackgroundModes</key>

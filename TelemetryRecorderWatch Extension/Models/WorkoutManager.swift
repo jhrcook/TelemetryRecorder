@@ -36,6 +36,9 @@ class WorkoutManager: NSObject, ObservableObject {
         // Requesting authorization.
         /// - Tag: RequestAuthorization
         // The quantity type to write to the health store.
+        let typesToShare: Set = [
+            HKQuantityType.workoutType()
+        ]
         
         // The quantity types to read from the health store.
         let typesToRead: Set = [
@@ -45,7 +48,7 @@ class WorkoutManager: NSObject, ObservableObject {
         ]
         
         // Request authorization for those quantity types.
-        healthStore.requestAuthorization(toShare: [], read: typesToRead) { (success, error) in
+        healthStore.requestAuthorization(toShare: typesToShare, read: typesToRead) { (success, error) in
             if let error = error {
                 print("Error requesting data read/share authorization: \(error.localizedDescription)")
                 return
@@ -73,7 +76,7 @@ class WorkoutManager: NSObject, ObservableObject {
         // Create the session and obtain the workout builder.
         /// - Tag: CreateWorkout
         do {
-            session = try HKWorkoutSession(healthStore: healthStore, configuration: self.workoutConfiguration())
+            session = try HKWorkoutSession(healthStore: healthStore, configuration: workoutConfiguration())
             builder = session.associatedWorkoutBuilder()
         } catch {
             // Handle any exceptions.
@@ -93,17 +96,11 @@ class WorkoutManager: NSObject, ObservableObject {
         // Start the workout session and begin data collection.
         /// - Tag: StartSession
         session.startActivity(with: Date())
-        builder.beginCollection(withStart: Date()) { (success, error) in
-            if let error = error {
-                print("Error starting data collection: \(error.localizedDescription)")
-                return
-            }
-            print("Workout data collection started successfully.")
-        }
     }
     
     
     func endWorkout() {
+        print("Ending workout session.")
         
         builder.endCollection(withEnd: Date()) { (success, error) in
             if let error = error {
@@ -115,7 +112,6 @@ class WorkoutManager: NSObject, ObservableObject {
             }
         }
         
-        print("Ending workout session.")
         session.end()
         running = false
     }
@@ -151,15 +147,26 @@ class WorkoutManager: NSObject, ObservableObject {
 extension WorkoutManager: HKWorkoutSessionDelegate {
     func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState,
                         from fromState: HKWorkoutSessionState, date: Date) {
+        
+        print("Workout session did change state: \(workoutStateDescription(fromState)) -> \(workoutStateDescription(toState))")
+        
         // Wait for the session to transition states before ending the builder.
         /// - Tag: SaveWorkout
-        print("Workout session did change state: \(workoutStateDescription(toState))")
-        if toState == .ended {
-            self.builder.finishWorkout { (workout, error) in
+        if toState == .running {
+            builder.beginCollection(withStart: Date()) { (success, error) in
+                if let error = error {
+                    print("Error starting data collection: \(error.localizedDescription)")
+                    return
+                }
+                print("Workout data collection started successfully.")
+            }
+        } else if toState == .ended {
+            builder.finishWorkout { (workout, error) in
                 // Optionally display a workout summary to the user.
                 if let error = error {
                     print("Builder did finish with error: \(error.localizedDescription)")
                 }
+                print("Builder finished successfully.")
                 self.resetWorkout()
             }
         }

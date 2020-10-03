@@ -77,7 +77,6 @@ struct WorkoutView: View {
         .onAppear {
             dataManager.reset()
             if !workoutComplete {
-                print("Starting workout!")
                 dataManager.workoutInfo = workoutManager.info
                 workoutManager.startWorkout()
                 startMotionManagerCollection()

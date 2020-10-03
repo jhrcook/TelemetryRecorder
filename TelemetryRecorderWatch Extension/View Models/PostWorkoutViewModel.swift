@@ -21,9 +21,8 @@ extension PostWorkoutView {
             
             DispatchQueue.main.async { transferFileStatus = .inProgress }
             transferDataToWatch()
-            DispatchQueue.main.async { transferFileStatus = .complete }
-            
             deleteDataFileFromWatch()
+            DispatchQueue.main.async { transferFileStatus = .complete }
         }
     }
     
