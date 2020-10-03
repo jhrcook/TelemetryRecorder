@@ -9,10 +9,18 @@ import Foundation
 import HealthKit
 import Combine
 
+
+struct WorkoutDataPoint: Codable {
+    let quantityType: String
+    let value: Double
+    let date: Date
+}
+
+
 class WorkoutManager: NSObject, ObservableObject {
     
     var info: WorkoutInformation?
-    var workoutData = WorkoutData()
+    var workoutData = [WorkoutDataPoint]()
     
     /// - Tag: DeclareSessionBuilder
     let healthStore = HKHealthStore()
@@ -216,68 +224,41 @@ extension WorkoutManager {
         case HKQuantityType.quantityType(forIdentifier: .heartRate):
             let heartRateUnit = HKUnit.count().unitDivided(by: HKUnit.minute())
             if let value = statistics.mostRecentQuantity()?.doubleValue(for: heartRateUnit) {
-                let newDP = WorkoutDataPoint(quantityType: HKQuantityTypeIdentifier.heartRate,
+                let newDP = WorkoutDataPoint(quantityType: HKQuantityTypeIdentifier.heartRate.rawValue,
                                              value: value,
                                              date: date)
-                workoutData.append(newDP)
+                add(newDP)
                 updateHeartRate(hr: value)
             }
             
         case HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned):
             let energyUnit = HKUnit.kilocalorie()
             if let value = statistics.sumQuantity()?.doubleValue(for: energyUnit) {
-                let newDP = WorkoutDataPoint(quantityType: HKQuantityTypeIdentifier.activeEnergyBurned,
+                let newDP = WorkoutDataPoint(quantityType: HKQuantityTypeIdentifier.activeEnergyBurned.rawValue,
                                              value: value,
                                              date: date)
-                workoutData.append(newDP)
+                add(newDP)
             }
         case HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN):
             let unit = HKUnit.minute()
             if let value = statistics.mostRecentQuantity()?.doubleValue(for: unit) {
-                let newDP = WorkoutDataPoint(quantityType: HKQuantityTypeIdentifier.heartRateVariabilitySDNN,
+                let newDP = WorkoutDataPoint(quantityType: HKQuantityTypeIdentifier.heartRateVariabilitySDNN.rawValue,
                                              value: value,
                                              date: date)
-                workoutData.append(newDP)
+                add(newDP)
             }
         default:
             break
         }
         
         DispatchQueue.main.async {
-            self.numberOfWorkoutDataPoints = self.workoutData.data.count
+            self.numberOfWorkoutDataPoints = self.workoutData.count
         }
     }
-}
-
-
-
-class WorkoutData {
     
-    var data = [WorkoutDataPoint]()
     
-    func append(_ newDataPoint: WorkoutDataPoint) {
-        data.append(newDataPoint)
+    func add(_ newDataPoint: WorkoutDataPoint) {
+        workoutData.append(newDataPoint)
     }
     
-    func dataAsDictionary() -> [String: [String]] {
-        
-        var dateFormatter: DateFormatter {
-            let df = DateFormatter()
-            df.dateFormat = "yyyy-MM-dd_HH:mm:ss"
-            return df
-        }
-        
-        return [
-            "quantityType": data.map { $0.quantityType.rawValue },
-            "value": data.map { String($0.value) },
-            "date": data.map { String($0.date.timeIntervalSince1970) }
-        ]
-    }
-    
-}
-
-struct WorkoutDataPoint {
-    let quantityType: HKQuantityTypeIdentifier
-    let value: Double
-    let date: Date
 }

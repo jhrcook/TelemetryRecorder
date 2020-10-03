@@ -10,8 +10,8 @@ import Foundation
 struct DataSaver {
     
     var workoutInfo: WorkoutInformation? = nil
-    var telemetryData: HardwareData? = nil
-    var workoutData: WorkoutData? = nil
+    var telemetryData: TelemetryDataManager? = nil
+    var workoutData: WorkoutManager? = nil
     
     var date = Date()
     
@@ -35,11 +35,15 @@ struct DataSaver {
         getDocumentsDirectory().appendingPathComponent(saveFileName)
     }
     
+    
+    struct CombinedData: Codable {
+        let telemetryData: [TelemetryDataPoint]?
+        let workoutData: [WorkoutDataPoint]?
+    }
+    
+    
     func saveDataToFile() {
-        let data: [String: Encodable] = [
-            "telemetryData": telemetryData?.dataAsDictionary() ?? "nil",
-            "workoutData": workoutData?.dataAsDictionary() ?? "nil"
-        ]
+        let data = CombinedData(telemetryData: telemetryData?.telemetryData, workoutData: workoutData?.workoutData)
         let encoder = JSONEncoder()
         
         do {

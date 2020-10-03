@@ -84,8 +84,8 @@ struct WorkoutView: View {
             presentationMode.wrappedValue.dismiss()
         }) {
             PostWorkoutView(dataSaver: DataSaver(workoutInfo: workoutManager.info,
-                                                 telemetryData: dataManager.hardwareData,
-                                                 workoutData: workoutManager.workoutData),
+                                                 telemetryData: dataManager,
+                                                 workoutData: workoutManager),
                             watchCommunicator: watchCommunicator)
         }
     }
