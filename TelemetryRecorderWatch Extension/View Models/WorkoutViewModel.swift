@@ -23,7 +23,7 @@ extension WorkoutView {
             
             dataManager.updateMotionData(data: data)
             DispatchQueue.main.async {
-                amountOfDataCollected = dataManager.numberOfHardwareDatapoints
+                amountOfDataCollected = dataManager.numberOfHardwareDataPoints
             }
         }
     }

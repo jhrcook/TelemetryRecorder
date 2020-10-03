@@ -30,33 +30,31 @@ struct WorkoutView: View {
         VStack {
             Spacer()
             
-            Text("Number of telemetry data points")
-                .multilineTextAlignment(.center)
-                .padding(.bottom, 5)
-            
-            ZStack {
-                if (workoutComplete) {
-                    Text("--")
-                        .font(.title)
+            HStack {
+                Spacer()
+                HStack {
+                    Image(systemName: "hand.raised")
+                    Text(": \(amountOfDataCollected)")
                         .foregroundColor(.green)
-                } else {
-                    Text("\(amountOfDataCollected)")
-                        .font(.title)
-                        .foregroundColor(.green)
+                        .bold()
                 }
+                Spacer()
+                HStack {
+                    Image(systemName: "waveform.path.ecg")
+                    Text(": \(workoutManager.numberOfWorkoutDataPoints)")
+                        .foregroundColor(.green)
+                        .bold()
+                }
+                Spacer()
             }
             .padding(.bottom, 5)
             
             HStack {
                 Spacer()
                 Image(systemName: "heart.circle")
-                    .font(.headline)
                     .foregroundColor(.red)
                 Text("HR: ")
-                    .foregroundColor(.white)
-                    .font(.headline)
-                Text(String(format: "%.1f", workoutManager.heartrate))
-                    .font(.headline)
+                Text("\(Int(workoutManager.heartrate))")
                     .bold()
                     .foregroundColor(.red)
                 Spacer()

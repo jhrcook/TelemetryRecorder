@@ -13,7 +13,7 @@ class TelemetryDataManager: ObservableObject {
     var workoutInfo: WorkoutInformation? = nil
     var hardwareData = HardwareData()
     
-    var numberOfHardwareDatapoints: Int {
+    var numberOfHardwareDataPoints: Int {
         get {
             hardwareData.data.count
         }
@@ -80,7 +80,6 @@ class HardwareData {
     var data = [HardwareDataPoint]()
     
     func dataAsDictionary() -> [String: [String: [Double]]] {
-        
         return [
             "attitude": [
                 "pitch": data.map({ $0.pitch }),

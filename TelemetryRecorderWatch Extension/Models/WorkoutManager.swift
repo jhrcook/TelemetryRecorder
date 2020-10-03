@@ -12,6 +12,7 @@ import Combine
 class WorkoutManager: NSObject, ObservableObject {
     
     var info: WorkoutInformation?
+    var workoutData = WorkoutData()
     
     /// - Tag: DeclareSessionBuilder
     let healthStore = HKHealthStore()
@@ -24,6 +25,7 @@ class WorkoutManager: NSObject, ObservableObject {
     
     /// - Tag: Publishers
     @Published var heartrate: Double = 0
+    @Published var numberOfWorkoutDataPoints: Int = 0
     
     
     init(info: WorkoutInformation?) {
@@ -124,21 +126,8 @@ class WorkoutManager: NSObject, ObservableObject {
     
     // MARK: - Update the UI
     // Update the published values.
-    func updateForStatistics(_ statistics: HKStatistics?) {
-        guard let statistics = statistics else { return }
-        
-        DispatchQueue.main.async {
-            switch statistics.quantityType {
-            case HKQuantityType.quantityType(forIdentifier: .heartRate):
-                /// - Tag: SetLabel
-                let heartRateUnit = HKUnit.count().unitDivided(by: HKUnit.minute())
-                let value = statistics.mostRecentQuantity()?.doubleValue(for: heartRateUnit)
-                let roundedValue = Double( round( 1 * value! ) / 1 )
-                self.heartrate = roundedValue
-            default:
-                return
-            }
-        }
+    func updateHeartRate(hr: Double) {
+        DispatchQueue.main.async { self.heartrate = hr }
     }
 }
 
@@ -211,9 +200,83 @@ extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
             
             /// - Tag: GetStatistics
             let statistics = workoutBuilder.statistics(for: quantityType)
-            updateForStatistics(statistics)
-            
-            // TODO: Something with the `statistics`.
+            recordDataPoint(statistics, at: Date())
         }
     }
+}
+
+
+
+// MARK: - Data collection
+extension WorkoutManager {
+    func recordDataPoint(_ statistics: HKStatistics?, at date: Date) {
+        guard let statistics = statistics else { return }
+        
+        switch statistics.quantityType {
+        case HKQuantityType.quantityType(forIdentifier: .heartRate):
+            let heartRateUnit = HKUnit.count().unitDivided(by: HKUnit.minute())
+            if let value = statistics.mostRecentQuantity()?.doubleValue(for: heartRateUnit) {
+                let newDP = WorkoutDataPoint(quantityType: HKQuantityTypeIdentifier.heartRate,
+                                             value: value,
+                                             date: date)
+                workoutData.append(newDP)
+                updateHeartRate(hr: value)
+            }
+            
+        case HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned):
+            let energyUnit = HKUnit.kilocalorie()
+            if let value = statistics.sumQuantity()?.doubleValue(for: energyUnit) {
+                let newDP = WorkoutDataPoint(quantityType: HKQuantityTypeIdentifier.activeEnergyBurned,
+                                             value: value,
+                                             date: date)
+                workoutData.append(newDP)
+            }
+        case HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN):
+            let unit = HKUnit.minute()
+            if let value = statistics.mostRecentQuantity()?.doubleValue(for: unit) {
+                let newDP = WorkoutDataPoint(quantityType: HKQuantityTypeIdentifier.heartRateVariabilitySDNN,
+                                             value: value,
+                                             date: date)
+                workoutData.append(newDP)
+            }
+        default:
+            break
+        }
+        
+        DispatchQueue.main.async {
+            self.numberOfWorkoutDataPoints = self.workoutData.data.count
+        }
+    }
+}
+
+
+
+class WorkoutData {
+    var data = [WorkoutDataPoint]()
+    
+    func append(_ newDataPoint: WorkoutDataPoint) {
+        data.append(newDataPoint)
+    }
+    
+    func dataAsDictionary() -> [String: [String]] {
+        
+        var dateFormatter: DateFormatter {
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd_HH:mm:ss"
+            return df
+        }
+        
+        return [
+            "quantityType": data.map { $0.quantityType.rawValue },
+            "value": data.map { String($0.value) },
+            "date": data.map { dateFormatter.string(from: $0.date) }
+        ]
+    }
+    
+}
+
+struct WorkoutDataPoint {
+    let quantityType: HKQuantityTypeIdentifier
+    let value: Double
+    let date: Date
 }
