@@ -21,15 +21,27 @@ extension WorkoutView {
                 return
             }
             
-            dataManager.updateMotionData(data: data, at: Date())
+            telemetryDataManager.updateMotionData(data: data, at: Date())
             DispatchQueue.main.async {
-                amountOfDataCollected = dataManager.numberOfTelemetryDataPoints
+                amountOfDataCollected = telemetryDataManager.numberOfTelemetryDataPoints
             }
         }
     }
     
     
     func stopMotionManagerCollection() {
+        workoutManager.endWorkout()
         motionManager.stopDeviceMotionUpdates()
+        workoutComplete = true
+        presentTransferSheet = true
+    }
+    
+    internal func viewIsAppearing() {
+        telemetryDataManager.reset()
+        if !workoutComplete {
+            telemetryDataManager.workoutInfo = workoutManager.info
+            workoutManager.startWorkout()
+            startMotionManagerCollection()
+        }
     }
 }

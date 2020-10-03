@@ -33,6 +33,7 @@ extension PostWorkoutView {
         print("   done")
     }
     
+    
     func transferDataToWatch() {
         print("Transfering data to phone...")
         watchCommunicator.transferToPhone(url: dataSaver.saveFileURL)
@@ -41,6 +42,12 @@ extension PostWorkoutView {
         }
         print("   done")
     }
+    
+    
+    func cancelOperations() {
+        watchCommunicator.cancelAllFileTransfers()
+    }
+    
     
     func deleteDataFileFromWatch() {
         do {

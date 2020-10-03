@@ -9,20 +9,35 @@ import SwiftUI
 import CoreMotion
 
 
+struct ImageAndCounter: View {
+    
+    let imageSystemName: String
+    var counterValue: Int
+    
+    var body: some View {
+        HStack {
+            Image(systemName: imageSystemName)
+            Text(": \(counterValue)")
+                .foregroundColor(.green)
+                .bold()
+        }
+    }
+}
+
+
 struct WorkoutView: View {
     
     @ObservedObject var workoutManager: WorkoutManager
     var watchCommunicator: WatchConnectivityManager
-    
-    var dataManager = TelemetryDataManager()
+    var telemetryDataManager = TelemetryDataManager()
     
     let motionManager = CMMotionManager()
     let queue = OperationQueue()
     
     @State var amountOfDataCollected: Int = 0
     
-    @State private var workoutComplete = false
-    @State private var presentTransferSheet = false
+    @State internal var workoutComplete = false
+    @State internal var presentTransferSheet = false
     
     @Environment(\.presentationMode) var presentationMode
     
@@ -32,19 +47,11 @@ struct WorkoutView: View {
             
             HStack {
                 Spacer()
-                HStack {
-                    Image(systemName: "hand.raised")
-                    Text(": \(amountOfDataCollected)")
-                        .foregroundColor(.green)
-                        .bold()
-                }
+                ImageAndCounter(imageSystemName: "hand.raised",
+                                counterValue: amountOfDataCollected)
                 Spacer()
-                HStack {
-                    Image(systemName: "waveform.path.ecg")
-                    Text(": \(workoutManager.numberOfWorkoutDataPoints)")
-                        .foregroundColor(.green)
-                        .bold()
-                }
+                ImageAndCounter(imageSystemName: "waveform.path.ecg",
+                                counterValue: workoutManager.numberOfWorkoutDataPoints)
                 Spacer()
             }
             .padding(.bottom, 5)
@@ -62,29 +69,17 @@ struct WorkoutView: View {
             
             Spacer()
             
-            Button(action: {
-                workoutManager.endWorkout()
-                stopMotionManagerCollection()
-                workoutComplete = true
-                presentTransferSheet = true
-            }) {
+            Button(action: stopMotionManagerCollection) {
                 Text("Done")
             }
         }
         .navigationBarBackButtonHidden(true)
-        .onAppear {
-            dataManager.reset()
-            if !workoutComplete {
-                dataManager.workoutInfo = workoutManager.info
-                workoutManager.startWorkout()
-                startMotionManagerCollection()
-            }
-        }
+        .onAppear(perform: viewIsAppearing)
         .sheet(isPresented: $presentTransferSheet, onDismiss: {
             presentationMode.wrappedValue.dismiss()
         }) {
             PostWorkoutView(dataSaver: DataSaver(workoutInfo: workoutManager.info,
-                                                 telemetryData: dataManager,
+                                                 telemetryData: telemetryDataManager,
                                                  workoutData: workoutManager),
                             watchCommunicator: watchCommunicator)
         }

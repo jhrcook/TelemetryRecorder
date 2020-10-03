@@ -44,12 +44,13 @@ struct PostWorkoutView: View {
             }
             
             Button(action: {
-                watchCommunicator.cancelAllFileTransfers()
+                cancelOperations()
                 presentationMode.wrappedValue.dismiss()
             }, label: {
                 Text("Cancel")
             })
         }
+        .navigationBarBackButtonHidden(true)
     }
 }
 

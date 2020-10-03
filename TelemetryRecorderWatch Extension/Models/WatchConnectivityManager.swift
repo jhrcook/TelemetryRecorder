@@ -46,15 +46,21 @@ class WatchConnectivityManager:  NSObject, WCSessionDelegate {
 // MARK: - Transfering data
 
 extension WatchConnectivityManager {
+    
+    /// Submit a request to transfer a file.
+    /// - Parameter url: The URL of the file to transfer.
     func transferToPhone(url: URL) {
         session.transferFile(url, metadata: nil)
     }
     
+    
+    /// Cancel all outstanding file transfers.
     func cancelAllFileTransfers() {
         for f in session.outstandingFileTransfers {
             f.cancel()
         }
     }
+    
     
     func session(_ session: WCSession, didFinish fileTransfer: WCSessionFileTransfer, error: Error?) {
         if let error = error {

@@ -19,18 +19,19 @@ struct WorkoutDataPoint: Codable {
 
 class WorkoutManager: NSObject, ObservableObject {
     
+    /// - Tag: Declare workout data information
     var info: WorkoutInformation?
     var workoutData = [WorkoutDataPoint]()
     
-    /// - Tag: DeclareSessionBuilder
+    /// - Tag: Declare HealthStore, WorkoutSession, and WorkoutBuilder
     let healthStore = HKHealthStore()
     var session: HKWorkoutSession!
     var builder: HKLiveWorkoutBuilder!
     
     // The app's workout state.
+    /// - Tag: Object state
     var running: Bool = false
-    
-    
+        
     /// - Tag: Publishers
     @Published var heartrate: Double = 0
     @Published var numberOfWorkoutDataPoints: Int = 0
@@ -41,10 +42,8 @@ class WorkoutManager: NSObject, ObservableObject {
     }
     
     
-    // Request authorization to access HealthKit.
+    /// Request authorization to access HealthKit.
     func requestAuthorization() {
-        // Requesting authorization.
-        /// - Tag: RequestAuthorization
         // The quantity type to write to the health store.
         let typesToShare: Set = [
             HKQuantityType.workoutType()
@@ -68,9 +67,8 @@ class WorkoutManager: NSObject, ObservableObject {
     }
     
     
-    // Provide the workout configuration.
-    func workoutConfiguration() -> HKWorkoutConfiguration {
-        /// - Tag: WorkoutConfiguration
+    /// Provide the workout configuration.
+    internal func workoutConfiguration() -> HKWorkoutConfiguration {
         let configuration = HKWorkoutConfiguration()
         configuration.activityType = .functionalStrengthTraining
         configuration.locationType = .indoor
@@ -78,13 +76,12 @@ class WorkoutManager: NSObject, ObservableObject {
     }
     
     
-    // Start the workout.
+    /// Start the workout.
     func startWorkout() {
         // Start the timer.
         running = true
         
         // Create the session and obtain the workout builder.
-        /// - Tag: CreateWorkout
         do {
             session = try HKWorkoutSession(healthStore: healthStore, configuration: workoutConfiguration())
             builder = session.associatedWorkoutBuilder()
@@ -99,12 +96,10 @@ class WorkoutManager: NSObject, ObservableObject {
         builder.delegate = self
         
         // Set the workout builder's data source.
-        /// - Tag: SetDataSource
         builder.dataSource = HKLiveWorkoutDataSource(healthStore: healthStore,
                                                      workoutConfiguration: workoutConfiguration())
         
         // Start the workout session and begin data collection.
-        /// - Tag: StartSession
         session.startActivity(with: Date())
     }
     
@@ -127,13 +122,17 @@ class WorkoutManager: NSObject, ObservableObject {
     }
     
     
+    /// Reset the workout data.
+    ///
+    /// This function sets the workout info to `nil` and the workout data is emptied.
     func resetWorkout() {
-        // Does nothing at the moment.
+        info = nil
+        workoutData = []
     }
     
     
     // MARK: - Update the UI
-    // Update the published values.
+    /// Update the published heart rate value.
     func updateHeartRate(hr: Double) {
         DispatchQueue.main.async { self.heartrate = hr }
     }
@@ -142,14 +141,13 @@ class WorkoutManager: NSObject, ObservableObject {
 
 // MARK: - HKWorkoutSessionDelegate
 extension WorkoutManager: HKWorkoutSessionDelegate {
+    
     func workoutSession(_ workoutSession: HKWorkoutSession, didChangeTo toState: HKWorkoutSessionState,
                         from fromState: HKWorkoutSessionState, date: Date) {
-        
         print("Workout session did change state: \(workoutStateDescription(fromState)) -> \(workoutStateDescription(toState))")
         
-        // Wait for the session to transition states before ending the builder.
-        /// - Tag: SaveWorkout
         if toState == .running {
+            // Start data collection when the state transitions to `running`.
             builder.beginCollection(withStart: Date()) { (success, error) in
                 if let error = error {
                     print("Error starting data collection: \(error.localizedDescription)")
@@ -158,6 +156,7 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
                 print("Workout data collection started successfully.")
             }
         } else if toState == .ended {
+            // Wait for the session to transition states before ending the builder.
             builder.finishWorkout { (workout, error) in
                 // Optionally display a workout summary to the user.
                 if let error = error {
@@ -169,11 +168,16 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
         }
     }
     
+    
     func workoutSession(_ workoutSession: HKWorkoutSession, didFailWithError error: Error) {
         print("Workout session failed: \(error.localizedDescription)")
     }
     
-    func workoutStateDescription(_ state: HKWorkoutSessionState) -> String {
+    
+    /// Return a description for the workout session state.
+    /// - Parameter state: A workout state.
+    /// - Returns: A descriptive string.
+    internal func workoutStateDescription(_ state: HKWorkoutSessionState) -> String {
         switch state {
         case .ended:
             return "ended"
@@ -196,17 +200,20 @@ extension WorkoutManager: HKWorkoutSessionDelegate {
 
 // MARK: - HKLiveWorkoutBuilderDelegate
 extension WorkoutManager: HKLiveWorkoutBuilderDelegate {
+    
     func workoutBuilderDidCollectEvent(_ workoutBuilder: HKLiveWorkoutBuilder) {
         // Does nothing for now.
     }
     
+    
     func workoutBuilder(_ workoutBuilder: HKLiveWorkoutBuilder, didCollectDataOf collectedTypes: Set<HKSampleType>) {
         for type in collectedTypes {
             guard let quantityType = type as? HKQuantityType else {
-                return // Nothing to do.
+                // Nothing to do.
+                return
             }
             
-            /// - Tag: GetStatistics
+            // Collect and record the statistic.
             let statistics = workoutBuilder.statistics(for: quantityType)
             recordDataPoint(statistics, at: Date())
         }
@@ -251,14 +258,16 @@ extension WorkoutManager {
             break
         }
         
+        // Update the number of data points publisher.
         DispatchQueue.main.async {
             self.numberOfWorkoutDataPoints = self.workoutData.count
         }
     }
     
     
+    /// Add a data point to the data array.
+    /// - Parameter newDataPoint: The new data point.
     func add(_ newDataPoint: WorkoutDataPoint) {
         workoutData.append(newDataPoint)
     }
-    
 }
