@@ -2,6 +2,7 @@
 
 #### ---- Attach packages ---- ####
 
+library(here)
 library(jhcutils)
 library(mustashe)
 library(glue)
@@ -31,15 +32,15 @@ source_all_files <- function(dir) {
 }
 
 for (dir in c("lib", "src")) {
-  source_all_files(dir)
+  source_all_files(here(dir))
 }
 
 source_lib <- function() {
-  source_all_files("lib")
+  source_all_files(here("lib"))
 }
 
 source_src <- function() {
-  source_all_files("src")
+  source_all_files(here("src"))
 }
 
 
