@@ -3,6 +3,11 @@ Hidden Markov Modeling
 
     suppressPackageStartupMessages(library(depmixS4))
 
+Exploratoring the data
+======================
+
+Load in some push-up data and explore the numbers.
+
     all_data_files <- get_data_file_names(data_dir)
     raw_pushup_data <- read_watch_data(all_data_files[2])
 
@@ -12,10 +17,12 @@ Hidden Markov Modeling
 
     raw_pushup_telemetry_data <- raw_pushup_data$telemetry_data
 
-    line_plot_telemetry <- function(df) {
+Plot the data over time.
+
+    line_plot_telemetry <- function(df, x = value) {
       df %>%
-        ggplot(aes(idx, value)) +
-        facet_wrap(~motion, ncol = 1, scales = "free_y") +
+        ggplot(aes(idx, {{ x }})) +
+        facet_wrap(~ motion, ncol = 1, scales = "free_y") +
         geom_line(aes(color = axis), alpha = 0.7) +
         scale_color_brewer(type = "qual", palette = "Dark2")
     }
@@ -24,11 +31,199 @@ Hidden Markov Modeling
 
 ![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
 
+Subset just the portions of the data where the push-ups are. This is
+some usefuly “clean” data for initial model fitting and testing.
+
     clean_pushup_data <- raw_pushup_telemetry_data %>%
       filter(between(idx, 250, 1400))
-    line_plot_telemetry(clean_pushup_data)
+    line_plot_telemetry(clean_pushup_data) +
+      theme(
+        plot.title = element_text(hjust = 0.5, face = "bold")
+      ) +
+      labs(title = "Subsetted push-up data")
 
-![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-3-2.png)<!-- -->
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+
+Data transformations
+--------------------
+
+### Smoothened data
+
+The `ksmooth` function from the ‘stats’ package has 2 kernel methods:
+*normal* and *box*.
+
+    clean_pushup_data %.% {
+      group_by(axis, motion)
+      mutate(smooth_value = ksmooth(date, value, kernel = "normal")$y)
+      ungroup()
+    } %>%
+      line_plot_telemetry(smooth_value)
+
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+
+    clean_pushup_data %.% {
+      group_by(axis, motion)
+      mutate(smooth_value = ksmooth(date, value, kernel = "box")$y)
+      ungroup()
+    } %>%
+      line_plot_telemetry(smooth_value)
+
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-6-1.png)<!-- -->
+
+In general, smoothing the data seems to have a larger effect on the
+acceleration data. Because the acceleration seems to oscillate back and
+forth very rapidly, the smoothing just crishes it back towards 0.
+
+    clean_pushup_data %.% {
+      group_by(axis, motion)
+      mutate(smooth_value = ksmooth(date, value, kernel = "normal")$y)
+      ungroup()
+      filter(between(idx, 600, 1000))
+      pivot_longer(
+        -c(date, idx, axis, motion),
+        names_to = "transformation",
+        values_to = "value"
+      )
+      filter(motion == "acceleration")
+    } %>%
+      ggplot(aes(idx, value)) +
+      facet_wrap(~ axis, ncol = 1) +
+      geom_line(aes(color = axis, alpha = transformation, size = transformation)) +
+      scale_color_brewer(type = "qual", palette = "Set1") +
+      scale_size_manual(values = c(2, 1)) +
+      scale_alpha_manual(values = c(0.7, 0.4))
+
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
+Perhaps, a running measure of values could be informative.
+
+    # Performs an action `fxn` on a running basis over `x`.
+    running_fxn <- function(x, fxn, n = 5) {
+      y <- x
+      for (i in seq(1, length(x))) {
+        x_i <- c()
+        for (j in seq(-n, n)) {
+          idx <- i + j
+          if (idx < 1 | idx > length(x)) { next }
+          x_i <- c(x_i, x[[idx]])
+        }
+        y[[i]] <- fxn(x_i)
+      }
+      return(y)
+    }
+
+Below are plots of the acceleration data with a few different
+transformations. A possible conclusion is that it may not be the actual
+acceleration values that matter, but how variable the data is. The
+`smooth_abs_max` value looks very promising. It is the smoothened
+version of `running_abs_max` which is maximum absolute value on a
+running-basis (± 10 positions on either side).
+
+    clean_pushup_data %.% {
+      group_by(axis, motion)
+      mutate(
+        running_var = running_fxn(value, fxn = var, n = 10),
+        running_abs_max = running_fxn(abs(value), fxn = max, n = 10),
+        smooth_abs_value = ksmooth(date, abs(value), kernel = "box")$y,
+        smooth_abs_max = ksmooth(date, running_abs_max, kernel = "box")$y
+      )
+      ungroup()
+      filter(between(idx, 600, 800))
+      pivot_longer(
+        -c(date, idx, axis, motion),
+        names_to = "transformation",
+        values_to = "value"
+      )
+      filter(motion == "acceleration")
+    }%>%
+      ggplot(aes(idx, value)) +
+      facet_grid(axis ~ transformation) +
+      geom_line(aes(color = transformation), alpha = 0.8) +
+      scale_color_brewer(type = "qual", palette = "Set1", guide = FALSE) 
+
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+The smoothening method on the cleaned push-up data.
+
+    clean_pushup_data %.% {
+      group_by(axis, motion)
+      mutate(
+        running_abs_max = running_fxn(abs(value), fxn = max, n = 10),
+        smooth_abs_max = ksmooth(date, running_abs_max, kernel = "box")$y
+      )
+      ungroup()
+    } %>%
+      line_plot_telemetry(smooth_abs_max)
+
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+
+The smoothening method on the raw push-up data (all of the data, not
+just the clipped middle portion).
+
+    raw_pushup_telemetry_data %.% {
+      group_by(axis, motion)
+      mutate(
+        running_abs_max = running_fxn(abs(value), fxn = max, n = 10),
+        smooth_abs_max = ksmooth(date, running_abs_max, kernel = "box")$y
+      )
+      ungroup()
+    } %>%
+      line_plot_telemetry(smooth_abs_max)
+
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
+### Scaled data
+
+    zscale <- function(x, na.rm = TRUE) {
+      (x - mean(x, na.rm = na.rm)) / sd(x, na.rm = na.rm)
+    }
+
+
+    clean_pushup_data %.% {
+      group_by(axis, motion)
+      mutate(
+        scaled_value = zscale(value)
+      )
+      ungroup()
+    } %>%
+      line_plot_telemetry(scaled_value)
+
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+
+Applying the smoothing method from above to scaled data.
+
+    clean_pushup_data %.% {
+      group_by(axis, motion)
+      mutate(
+        scaled_value = zscale(value),
+        running_abs_max = running_fxn(abs(scaled_value), fxn = max, n = 10),
+        smooth_abs_max = ksmooth(date, running_abs_max, kernel = "box")$y
+        
+      )
+      ungroup()
+    } %>%
+      line_plot_telemetry(smooth_abs_max)
+
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+
+The scaled smooth data looks very promising.
+
+    raw_pushup_telemetry_data %.% {
+      group_by(axis, motion)
+      mutate(
+        scaled_value = zscale(value),
+        running_abs_max = running_fxn(abs(scaled_value), fxn = max, n = 10),
+        smooth_abs_max = ksmooth(date, running_abs_max, kernel = "box")$y
+        
+      )
+      ungroup()
+    } %>%
+      line_plot_telemetry(smooth_abs_max)
+
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+
+Exploration of Hidden Markov Models (HMM)
+-----------------------------------------
 
     pivot_telemetry_data <- function(telemetry_data) {
       telemetry_data %>%
@@ -200,7 +395,7 @@ Hidden Markov Modeling
     data_and_hmm_plot(clean_pushup_data, best_cleaned_model) +
       plot_layout(heights = c(2, 1))
 
-![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
 
     raw_pushup_wide <- pivot_telemetry_data(raw_pushup_telemetry_data)
 
@@ -268,4 +463,4 @@ Hidden Markov Modeling
     data_and_hmm_plot(raw_pushup_telemetry_data, best_raw_model) +
       plot_layout(heights = c(2, 1))
 
-![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+![](05_005-hidden-markov-modeling_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
