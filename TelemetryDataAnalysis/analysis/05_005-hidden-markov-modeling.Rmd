@@ -1,0 +1,205 @@
+---
+title: "Hidden Markov Modeling"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "#>", dpi = 500)
+source(here::here("start.R"))
+theme_set(theme_minimal())
+set.seed(0)
+```
+
+
+```{r}
+suppressPackageStartupMessages(library(depmixS4))
+```
+
+
+```{r}
+all_data_files <- get_data_file_names(data_dir)
+raw_pushup_data <- read_watch_data(all_data_files[2])
+
+raw_pushup_telemetry_data <- raw_pushup_data$telemetry_data
+```
+
+```{r}
+line_plot_telemetry <- function(df) {
+  df %>%
+    ggplot(aes(idx, value)) +
+    facet_wrap(~motion, ncol = 1, scales = "free_y") +
+    geom_line(aes(color = axis), alpha = 0.7) +
+    scale_color_brewer(type = "qual", palette = "Dark2")
+}
+
+line_plot_telemetry(raw_pushup_telemetry_data)
+
+clean_pushup_data <- raw_pushup_telemetry_data %>%
+  filter(between(idx, 250, 1400))
+line_plot_telemetry(clean_pushup_data)
+```
+
+```{r}
+pivot_telemetry_data <- function(telemetry_data) {
+  telemetry_data %>%
+    pivot_wider(
+      c(date, idx),
+      names_from = axis,
+      values_from = value
+    )
+}
+
+
+construct_full_telemetry_hmm_model <- function(d, nstates) {
+  depmix(
+    list(
+      x ~ 1,
+      y ~ 1,
+      z ~ 1,
+      pitch ~ 1,
+      roll ~ 1,
+      yaw ~ 1
+    ),
+    nstates = nstates,
+    family = list(
+      gaussian(), gaussian(), gaussian(),
+      gaussian(), gaussian(), gaussian()
+    ),
+    data = d
+  )
+}
+
+
+construct_accel_telemetry_hmm_model <- function(d, nstates) {
+  depmix(
+    list(
+      x ~ 1,
+      y ~ 1,
+      z ~ 1
+    ),
+    nstates = nstates,
+    family = list(gaussian(), gaussian(), gaussian()),
+    data = d
+  )
+}
+
+
+construct_attitude_telemetry_hmm_model <- function(d, nstates) {
+  depmix(
+    list(
+      pitch ~ 1,
+      roll ~ 1,
+      yaw ~ 1
+    ),
+    nstates = nstates,
+    family = list(gaussian(), gaussian(), gaussian()),
+    data = d
+  )
+}
+```
+
+```{r}
+pushup_data_wide <- pivot_telemetry_data(clean_pushup_data)
+
+hmm_construction_functions <- c(
+  construct_full_telemetry_hmm_model,
+  construct_accel_telemetry_hmm_model,
+  construct_attitude_telemetry_hmm_model
+)
+
+hmm_cleaned_models <- tibble(
+  nstates = rep(c(2, 3), 3),
+  fxn = rep(hmm_construction_functions, each = 2)
+) %>%
+  mutate(
+    model = map2(fxn, nstates, ~ .x(d = pushup_data_wide, nstates = .y)),
+    fit = map(model, fit),
+    aic = map_dbl(fit, AIC),
+    bic = map_dbl(fit, BIC)
+  )
+
+hmm_cleaned_models
+```
+
+```{r}
+plot_hmm_results <- function(hmm_fit) {
+  posterior(hmm_fit) %>%
+    as_tibble() %>%
+    mutate(idx = row_number()) %>%
+    pivot_longer(-c(idx, state)) %>%
+    ggplot(aes(x = idx, y = value, color = name)) +
+    facet_grid(name ~ .) +
+    geom_line(size = 1.2, alpha = 0.8) +
+    scale_color_brewer(type = "qual", palette = "Set1") +
+    scale_y_continuous(breaks = c(0, 0.5, 1)) +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+    ) +
+    labs(
+      x = "data point",
+      y = "probability of state",
+      color = "state",
+      title = "Hidden Markov Model states"
+    )
+}
+
+
+data_and_hmm_plot <- function(model_data, hmm_fit) {
+  data_p <- model_data %>%
+    mutate(motion_type = str_to_title(axis)) %>%
+    line_plot_telemetry() +
+    labs(
+      x = NULL,
+      y = "value"
+    ) +
+    theme(
+      strip.text = element_text(size = 11, face = "bold")
+    )
+
+  hmm_p <- plot_hmm_results(hmm_fit)
+
+  data_p / hmm_p
+}
+```
+
+```{r}
+get_best_model <- function(model_df) {
+  model_df$fit[which.min(model_df$aic)][[1]]
+}
+
+best_cleaned_model <- get_best_model(hmm_cleaned_models)
+summary(best_cleaned_model)
+```
+
+```{r}
+data_and_hmm_plot(clean_pushup_data, best_cleaned_model) +
+  plot_layout(heights = c(2, 1))
+```
+
+
+```{r}
+raw_pushup_wide <- pivot_telemetry_data(raw_pushup_telemetry_data)
+
+hmm_raw_models <- tibble(
+  nstates = c(2:5),
+  fxn = rep(c(construct_full_telemetry_hmm_model), 4)
+) %>%
+  mutate(
+    model = map2(fxn, nstates, ~ .x(d = raw_pushup_wide, nstates = .y)),
+    fit = map(model, fit),
+    aic = map_dbl(fit, AIC),
+    bic = map_dbl(fit, BIC)
+  )
+
+hmm_raw_models
+```
+
+```{r}
+best_raw_model <- get_best_model(hmm_raw_models)
+summary(best_raw_model)
+```
+```{r}
+data_and_hmm_plot(raw_pushup_telemetry_data, best_raw_model) +
+  plot_layout(heights = c(2, 1))
+```
+
