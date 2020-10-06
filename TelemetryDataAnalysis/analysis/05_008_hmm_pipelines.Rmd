@@ -1,0 +1,273 @@
+---
+title: "Hidden Markov Model-based learning pipelines"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "#>", dpi = 500)
+
+suppressPackageStartupMessages(library(depmixS4))
+
+source(here::here("start.R"))
+theme_set(theme_minimal())
+set.seed(0)
+```
+
+Below, I try out a few HMM-based modeling and prediciton pipelines.
+
+## Data
+
+```{r, warning=FALSE}
+zscale <- function(x, na.rm = TRUE) {
+  (x - mean(x, na.rm = na.rm)) / sd(x, na.rm = na.rm)
+}
+
+
+apply_scale_trans <- function(df, x = value, y = scaled_value) {
+  df %.% {
+    group_by(axis, motion)
+    mutate({{ y }} := zscale({{ x }}))
+    ungroup()
+  }
+}
+
+
+running_fxn <- function(x, fxn, n = 5) {
+  y <- x
+  for (i in seq(1, length(x))) {
+    x_i <- c()
+    for (j in seq(-n, n)) {
+      idx <- i + j
+      if (idx < 1 | idx > length(x)) { next }
+      x_i <- c(x_i, x[[idx]])
+    }
+    y[[i]] <- fxn(x_i)
+  }
+  return(y)
+}
+
+
+apply_smoothing_trans <- function(df, 
+                                  x = value, 
+                                  y = smooth_value, 
+                                  rolling_n = 10) {
+  df %.% {
+    group_by(axis, motion)
+    mutate(
+      {{ y }} := running_fxn(abs({{ x }}), fxn = max, n = rolling_n),
+      {{ y }} := ksmooth(date, {{ y }}, kernel = "box")$y
+    )
+  }
+}
+
+
+
+transform_pushup_data <- function(df) {
+  df %>%
+    apply_scale_trans() %>%
+    apply_smoothing_trans(x = scaled_value)
+}
+
+
+pushup_data <- tibble(filename = get_data_file_names(data_dir)) %.% {
+  filter(str_detect(filename, "Push"))
+  mutate(
+    workout_idx = row_number(),
+    all_data = map(filename, read_watch_data),
+    file_info = map(all_data, ~ .x$meta_data),
+    data = map(all_data, ~ .x$telemetry_data),
+    data = map(data, transform_pushup_data),
+    data = map(data, ~ rename(.x, time_step = date)),
+    data = map(data, ~ select(.x,
+      time_step, idx, motion, axis, value, scaled_value, smooth_value
+    ))
+  )
+  select(-all_data, -filename)
+  unnest(file_info)
+  select(workout_idx, exercise, reps, date, data)
+}
+
+pushup_data
+```
+
+## Pipeline #1. Heuristic chop & simple HMM
+
+### Overview
+
+**Pipeline**
+
+1. Chop the raw data within an IQR of the time steps to get just the clena pushup data.
+2. Use an HMM to identify the 2 states of the push-up.
+3. Use the HMM to cut the chopped data into the two states of training a classifier.
+4. Train an classifier on this training data.
+5. Apply the classifier to the original data to test accuracy.
+
+**Experimental features**
+
+1. The type of classifier to use.
+2. Would it be possible to train the classifer with *3* classes, one being "unknown" and having this be the very beginning and ending data?
+
+### Pipeline
+
+#### 1. Chop the data
+
+Select only the time steps in the 30 and 70 percentiles.
+
+```{r}
+chopped_pushup_data <- pushup_data %.% {
+  unnest(data)
+  group_by(workout_idx)
+  filter(time_step > quantile(time_step, 0.3) & time_step < quantile(time_step, 0.7))
+  ungroup()
+}
+
+# Number of data points per workout.
+chopped_pushup_data %>%
+  group_by(workout_idx) %>%
+  summarise(n_datapoints = n_distinct(idx)) %>%
+  ungroup()
+
+chopped_pushup_data %>%
+  ggplot(aes(x = time_step, y = smooth_value)) +
+  facet_wrap(~ workout_idx, scales = "free", ncol = 2) +
+  geom_line(aes(color = axis))
+```
+
+#### 2. Train HMM
+
+```{r}
+nest_pushup_exercises <- function(df) {
+  df %>%
+    group_by(workout_idx, exercise, reps, date) %>%
+    nest() %>%
+    ungroup()
+}
+
+pivot_telemetry_data <- function(telemetry_data, x = value) {
+  telemetry_data %>%
+    pivot_wider(
+      c(time_step, idx),
+      names_from = axis,
+      values_from = {{ x }}
+    )
+}
+```
+
+
+```{r}
+construct_pushup_hmm <- function(d, nstates = 2) {
+  depmix(
+    list(
+      x ~ 1,
+      y ~ 1,
+      z ~ 1,
+      pitch ~ 1,
+      roll ~ 1,
+      yaw ~ 1
+    ),
+    nstates = nstates,
+    family = list(
+      gaussian(), gaussian(), gaussian(),
+      gaussian(), gaussian(), gaussian()
+    ),
+    data = d
+  )
+}
+
+
+
+chopped_pushup_hmms <- chopped_pushup_data %.% {
+  nest_pushup_exercises()
+  mutate(
+    wide_data = map(data, pivot_telemetry_data, x = smooth_value),
+    model = map(wide_data, construct_pushup_hmm),
+    fit = map(model, fit)
+  )
+}
+```
+
+```{r}
+plot_telmetry_data <- function(df, x = value) {
+  df %>%
+    mutate(motion = str_to_title(motion)) %>%
+    ggplot(aes(idx, {{ x }})) +
+    facet_wrap(~ motion, ncol = 1, scales = "free_y") +
+    geom_line(aes(color = axis), alpha = 0.7) +
+    scale_color_brewer(type = "qual", palette = "Dark2") +
+    theme(
+      strip.text = element_text(hjust = 0.5, size = 11)
+    )
+}
+
+plot_hmm_results <- function(hmm_fit) {
+  posterior(hmm_fit) %>%
+    as_tibble() %>%
+    mutate(idx = row_number()) %>%
+    pivot_longer(-c(idx, state)) %>%
+    ggplot(aes(x = idx, y = value, color = name)) +
+    facet_grid(name ~ .) +
+    geom_line(size = 1, alpha = 0.8) +
+    scale_color_brewer(type = "qual", palette = "Set1") +
+    scale_y_continuous(breaks = c(0, 0.5, 1)) +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 11),
+    ) +
+    labs(
+      x = "data point",
+      y = "probability of state",
+      color = "state",
+      title = "Hidden Markov Model states"
+    )
+}
+
+
+plot_hmm_fit <- function(data, hmm_fit, data_x) {
+  data_plot <- plot_telmetry_data(data, x = {{ data_x }}) +
+    theme(axis.title.x = element_blank())
+  hmm_plot <- plot_hmm_results(hmm_fit)
+  patch <- data_plot / hmm_plot + plot_layout(heights = c(3, 1))
+  plot(patch)
+  return(NULL)
+}
+
+chopped_pushup_hmms %>%
+  mutate(a = walk2(data, fit, plot_hmm_fit, data_x = smooth_value))
+```
+
+#### 3. Prepare training data with the HMM
+
+
+```{r}
+hmm <- chopped_pushup_hmms$fit[[1]]
+d <- chopped_pushup_hmms$wide_data[[1]]
+summary(hmm)
+```
+
+```{r}
+training_data_1 <- posterior(hmm) %>%
+  bind_cols(d) %>%
+  mutate(state = case_when(
+    S1 > 0.95 ~ "state1",
+    S2 > 0.95 ~ "state2",
+    TRUE ~ "unknown"
+  ))
+
+training_data_2 <- pushup_data %.% {
+  slice(1)
+  unnest(data)
+  filter(time_step < quantile(time_step, 0.1) | time_step > quantile(time_step, 0.9))
+  pivot_telemetry_data(x = smooth_value)
+  add_column(state = "unknown")
+}
+
+training_data <- bind_rows(training_data_1, training_data_2)
+training_data
+```
+
+**To-Do**:
+
+- continue with the practice sample started above:
+  - look into using TidyModels for the following analysis
+  - split the data into training and testing data
+  - fit a few different classifiers with this training data and see how well they do
+    - decision forest, decision tree, kNN, SVM
