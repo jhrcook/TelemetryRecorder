@@ -1,0 +1,11 @@
+---
+title: "TITLE"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "#>", dpi = 500)
+source(here::here("start.R"))
+theme_set(theme_minimal())
+set.seed(0)
+```
