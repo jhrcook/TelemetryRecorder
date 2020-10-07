@@ -11,7 +11,15 @@ library(patchwork)
 library(nakedpipe)
 library(magrittr)
 library(tidyverse)
+library(conflicted)
 
+
+#### ---- Conflicts ---- ####
+
+conflict_prefer("select", "dplyr", quiet = TRUE)
+conflict_prefer("filter", "dplyr", quiet = TRUE)
+conflict_prefer("lag", "dplyr", quiet = TRUE)
+conflict_prefer("mutate", "dplyr", quiet = TRUE)
 
 
 #### ---- Plotting ---- ####
