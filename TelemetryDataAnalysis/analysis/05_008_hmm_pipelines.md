@@ -257,6 +257,8 @@ Select only the time steps in the 30 and 70 percentiles.
 
 #### 3. Prepare training data with the HMM
 
+This step is currently being worked on
+
     hmm <- chopped_pushup_hmms$fit[[1]]
     d <- chopped_pushup_hmms$wide_data[[1]]
     summary(hmm)
@@ -325,6 +327,159 @@ Select only the time steps in the 30 and 70 percentiles.
     #> 9 0.6042039 0.5055054 0.6149831
     #>  [ reached 'max' / getOption("max.print") -- omitted 998 rows ]
 
+    table(training_data$state)
+
+    #> 
+    #>  state1  state2 unknown 
+    #>     296     351     360
+
+A t-SNE plot of the data made to train the classifiers.
+
+    training_data_tsne <- training_data %.% {
+      ~~ original_data <- .
+      select(-S1, -S2, -time_step, -state)
+      as.data.frame()
+      column_to_rownames("idx")
+      unique()
+      ~~ min_data <- .
+      Rtsne::Rtsne()
+      .$Y
+      as.data.frame()
+      mutate(idx = as.numeric(rownames(min_data)))
+      left_join(original_data, by = "idx")
+    }
+
+    training_data_tsne %>%
+      ggplot(aes(V1, V2, color = state)) +
+      geom_jitter(size = 1.4, alpha = 0.6, height = 0.5, width = 0.5) +
+      scale_color_manual(values = c("orange", "purple", "black")) +
+      labs(
+        x = "t-SNE 1",
+        y = "t-SNE 2",
+        title = "t-SNE of push-up telemetry data"
+      )
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+    # Append a prefix to each column name of a data frame.
+    prefix_colnames <- function(d, prefix) {
+      colnames(d) <- paste0(prefix, colnames(d))
+      return(d)
+    }
+
+    # Collect classification ROC results.
+    pushup_classification_roc <- function(fit, train_data, test_data) {
+      f <- function(fit, data) {
+        pred_data <- predict(fit, data, type = "prob") %>%
+          bind_cols(data)
+        roc_curve <- roc_curve(
+          pred_data,
+          truth = factor(state), 
+          .pred_state1, .pred_state2, .pred_unknown
+        )
+        roc_auc_est <- roc_auc(
+          pred_data, 
+          truth = factor(state), 
+          .pred_state1, .pred_state2, .pred_unknown
+        )
+        return(tibble(
+          pred_prob = list(pred_data),
+          roc_curve = list(roc_curve),
+          roc_auc = roc_auc_est$.estimate[[1]]
+        ))
+      }
+      
+      train_pred <- f(fit, train_data) %>% prefix_colnames("train_")
+      test_pred <- f(fit, test_data) %>% prefix_colnames("test_")
+      bind_cols(train_pred, test_pred)
+    }
+
+    # Collect classification metrics.
+    pushup_classification_metrics <- function(fit, train_data, test_data) {
+      
+      metric_f <- function(pred_data, fxn) {
+        fxn(pred_data, state, .pred_class)$.estimate[[1]]
+      }
+      
+      f <- function(fit, data) {
+        pred_data <- predict(fit, data, type = "class") %>%
+          bind_cols(data) %>%
+          mutate(state = factor(state))
+        tibble(
+          pred_class = list(pred_data),
+          sensitivity = metric_f(pred_data, sensitivity),
+          specificity = metric_f(pred_data, specificity),
+          precision = metric_f(pred_data, precision),
+          mcc = metric_f(pred_data, mcc),
+          fmeasure = metric_f(pred_data, f_meas),
+          accuracy = metric_f(pred_data, accuracy),
+          kap = metric_f(pred_data, kap),
+          ppv = metric_f(pred_data, ppv),
+          npv = metric_f(pred_data, npv)
+        )
+      }
+      
+      train_pred <- f(fit, train_data) %>% prefix_colnames("train_")
+      test_pred <- f(fit, test_data) %>% prefix_colnames("test_")
+      bind_cols(train_pred, test_pred)
+    }
+
+
+    knn_assessment_workflow <- function(fit, train_data, test_data) {
+      roc_results <- pushup_classification_roc(fit, train_data, test_data)
+      class_results <- pushup_classification_metrics(fit, train_data, test_data)
+      return(bind_cols(roc_results, class_results))
+    }
+
+    run_knn_workflow <- function(data, prop = 0.75) {
+      
+      data_split <- initial_split(data, prop = prop, strata = "state")
+
+      pushup_recipe <- recipe(
+        state ~ x + y + z + pitch + roll + yaw, 
+        data = training_data
+      )
+      
+      # Model specification.
+      knn_spec <- nearest_neighbor(mode = "classification") %>%
+        set_engine("kknn")
+      
+      # TidyModels workflow.
+      pushup_workflow <- workflow() %>%
+        add_model(knn_spec) %>%
+        add_recipe(pushup_recipe)
+      
+      # Data.
+      train_data <- training(data_split)
+      test_data <- testing(data_split)
+      
+      # Fit the model.
+      pushup_knn_fit <- parsnip::fit(pushup_workflow, data = train_data)
+
+      # Get model assessment values.
+      model_assessment <- knn_assessment_workflow(
+        pushup_knn_fit, 
+        train_data, 
+        test_data
+      )
+      return(model_assessment)
+    }
+
+
+    run_knn_workflow(training_data)
+
+    #> # A tibble: 1 x 26
+    #>   train_pred_prob train_roc_curve train_roc_auc test_pred_prob test_roc_curve
+    #>   <list>          <list>                  <dbl> <list>         <list>        
+    #> 1 <tibble [756 ×… <tibble [64 × …          1.00 <tibble [251 … <tibble [40 ×…
+    #> # … with 21 more variables: test_roc_auc <dbl>, train_pred_class <list>,
+    #> #   train_sensitivity <dbl>, train_specificity <dbl>, train_precision <dbl>,
+    #> #   train_mcc <dbl>, train_fmeasure <dbl>, train_accuracy <dbl>,
+    #> #   train_kap <dbl>, train_ppv <dbl>, train_npv <dbl>, test_pred_class <list>,
+    #> #   test_sensitivity <dbl>, test_specificity <dbl>, test_precision <dbl>,
+    #> #   test_mcc <dbl>, test_fmeasure <dbl>, test_accuracy <dbl>, test_kap <dbl>,
+    #> #   test_ppv <dbl>, test_npv <dbl>
+
 **To-Do**:
 
 -   continue with the practice sample started above:
@@ -332,4 +487,4 @@ Select only the time steps in the 30 and 70 percentiles.
     -   split the data into training and testing data
     -   fit a few different classifiers with this training data and see
         how well they do
-        -   decision forest, decision tree, kNN, SVM
+        -   decision forest, decision tree, kNN, SVM, naive Bayes
