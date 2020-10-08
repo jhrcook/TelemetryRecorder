@@ -26,7 +26,9 @@ Data
         x_i <- c()
         for (j in seq(-n, n)) {
           idx <- i + j
-          if (idx < 1 | idx > length(x)) { next }
+          if (idx < 1 | idx > length(x)) {
+            next
+          }
           x_i <- c(x_i, x[[idx]])
         }
         y[[i]] <- fxn(x_i)
@@ -35,9 +37,9 @@ Data
     }
 
 
-    apply_smoothing_trans <- function(df, 
-                                      x = value, 
-                                      y = smooth_value, 
+    apply_smoothing_trans <- function(df,
+                                      x = value,
+                                      y = smooth_value,
                                       rolling_n = 10) {
       df %.% {
         group_by(axis, motion)
@@ -66,7 +68,8 @@ Data
         data = map(all_data, ~ .x$telemetry_data),
         data = map(data, transform_pushup_data),
         data = map(data, ~ rename(.x, time_step = date)),
-        data = map(data, ~ select(.x,
+        data = map(data, ~ select(
+          .x,
           time_step, idx, motion, axis, value, scaled_value, smooth_value
         ))
       )
@@ -138,7 +141,7 @@ Select only the time steps in the 30 and 70 percentiles.
 
     chopped_pushup_data %>%
       ggplot(aes(x = time_step, y = smooth_value)) +
-      facet_wrap(~ workout_idx, scales = "free", ncol = 2) +
+      facet_wrap(~workout_idx, scales = "free", ncol = 2) +
       geom_line(aes(color = axis))
 
 ![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
@@ -201,7 +204,7 @@ Select only the time steps in the 30 and 70 percentiles.
       df %>%
         mutate(motion = str_to_title(motion)) %>%
         ggplot(aes(idx, {{ x }})) +
-        facet_wrap(~ motion, ncol = 1, scales = "free_y") +
+        facet_wrap(~motion, ncol = 1, scales = "free_y") +
         geom_line(aes(color = axis), alpha = 0.7) +
         scale_color_brewer(type = "qual", palette = "Dark2") +
         theme(
@@ -257,91 +260,76 @@ Select only the time steps in the 30 and 70 percentiles.
 
 #### 3. Prepare training data with the HMM
 
-This step is currently being worked on
+The HMM segments the data into the three states: `state1`, `state2`, and
+`unknown`. The `"unknown"` state is when the HMM believes that the
+probability of either state 1 or 2 is less than 0.90. Additional
+`unknown` data is provided by takign the edges of the time series data
+(the data before the push-ups begin).
 
-    hmm <- chopped_pushup_hmms$fit[[1]]
-    d <- chopped_pushup_hmms$wide_data[[1]]
-    summary(hmm)
+    chop_data_with_hmm <- function(fit,
+                                   wide_data,
+                                   full_data,
+                                   prob_cutoff = 0.9,
+                                   outer_unknown_q = 0.1,
+                                   ...) {
+      training_data_1 <- posterior(fit) %.% {
+        bind_cols(wide_data)
+        mutate(state = case_when(
+          S1 > prob_cutoff ~ "state1",
+          S2 > prob_cutoff ~ "state2",
+          TRUE ~ "unknown"
+        ))
+      }
 
-    #> Initial state probabilities model 
-    #> pr1 pr2 
-    #>   0   1 
-    #> 
-    #> Transition matrix 
-    #>         toS1  toS2
-    #> fromS1 0.980 0.020
-    #> fromS2 0.017 0.983
-    #> 
-    #> Response parameters 
-    #> Resp 1 : gaussian 
-    #> Resp 2 : gaussian 
-    #> Resp 3 : gaussian 
-    #> Resp 4 : gaussian 
-    #> Resp 5 : gaussian 
-    #> Resp 6 : gaussian 
-    #>     Re1.(Intercept) Re1.sd Re2.(Intercept) Re2.sd Re3.(Intercept) Re3.sd
-    #> St1           0.547  0.174           0.910  0.259           0.588  0.158
-    #> St2           1.369  0.421           1.734  0.370           1.177  0.236
-    #>     Re4.(Intercept) Re4.sd Re5.(Intercept) Re5.sd Re6.(Intercept) Re6.sd
-    #> St1           0.821  0.085           0.438  0.067           0.442  0.088
-    #> St2           0.686  0.091           0.572  0.078           0.514  0.080
+      training_data_2 <- full_data %.% {
+        filter(
+          time_step < quantile(time_step, 0.1) |
+            time_step > quantile(time_step, 1 - 0.1)
+        )
+        pivot_telemetry_data(x = smooth_value)
+        add_column(state = "unknown")
+      }
 
-    training_data_1 <- posterior(hmm) %>%
-      bind_cols(d) %>%
-      mutate(state = case_when(
-        S1 > 0.95 ~ "state1",
-        S2 > 0.95 ~ "state2",
-        TRUE ~ "unknown"
-      ))
-
-    training_data_2 <- pushup_data %.% {
-      slice(1)
-      unnest(data)
-      filter(time_step < quantile(time_step, 0.1) | time_step > quantile(time_step, 0.9))
-      pivot_telemetry_data(x = smooth_value)
-      add_column(state = "unknown")
+      bind_rows(training_data_1, training_data_2)
     }
 
-    training_data <- bind_rows(training_data_1, training_data_2)
-    training_data
+    if (!"full_data" %in% colnames(chopped_pushup_hmms)) {
+      chopped_pushup_hmms <- chopped_pushup_hmms %>%
+        left_join(
+          pushup_data %>% select(workout_idx, full_data = data),
+          by = "workout_idx"
+        )
+    }
 
-    #>    state           S1        S2 time_step idx        x        y         z
-    #> 1 state2 0.000000e+00 1.0000000  5.065272 506 1.255308 1.122858 0.8085634
-    #> 2 state2 2.049341e-07 0.9999998  5.076032 507 1.305323 1.154684 0.8373105
-    #> 3 state2 6.062606e-09 1.0000000  5.084931 508 1.377065 1.200807 0.8782624
-    #> 4 state2 4.728051e-10 1.0000000  5.095208 509 1.428101 1.233282 0.9075962
-    #> 5 state2 3.433873e-11 1.0000000  5.105285 510 1.479137 1.265757 0.9369300
-    #> 6 state2 2.318305e-12 1.0000000  5.115360 511 1.530173 1.298233 0.9662638
-    #> 7 state2 1.992395e-13 1.0000000  5.125313 512 1.571616 1.330708 0.9955976
-    #> 8 state2 2.359157e-14 1.0000000  5.135782 513 1.601343 1.366010 1.0249314
-    #> 9 state2 4.271181e-15 1.0000000  5.145336 514 1.628648 1.387252 1.0402729
-    #>       pitch       yaw      roll
-    #> 1 0.6414071 0.4838070 0.5596884
-    #> 2 0.6342582 0.4867968 0.5667852
-    #> 3 0.6248701 0.4919223 0.5782134
-    #> 4 0.6197661 0.4946057 0.5851250
-    #> 5 0.6157154 0.4971909 0.5917577
-    #> 6 0.6124956 0.4995942 0.5980708
-    #> 7 0.6099608 0.5017864 0.6040403
-    #> 8 0.6080596 0.5037295 0.6096021
-    #> 9 0.6042039 0.5055054 0.6149831
-    #>  [ reached 'max' / getOption("max.print") -- omitted 998 rows ]
+    chopped_pushup_hmms$classifier_data <- pmap(chopped_pushup_hmms, chop_data_with_hmm)
 
-    table(training_data$state)
+    chopped_pushup_hmms %.% {
+      select(workout_idx, classifier_data)
+      unnest(classifier_data)
+      count(workout_idx, state)
+      pivot_wider(-state, names_from = "state", values_from = "n")
+    }
 
-    #> 
-    #>  state1  state2 unknown 
-    #>     296     351     360
+    #> # A tibble: 5 x 4
+    #>   workout_idx state1 state2 unknown
+    #>         <int>  <int>  <int>   <int>
+    #> 1           1    299    355     353
+    #> 2           2    352    247     329
+    #> 3           3    322    398     387
+    #> 4           4    327    364     369
+    #> 5           5    430    348     413
 
 A t-SNE plot of the data made to train the classifiers.
 
-    training_data_tsne <- training_data %.% {
-      ~~ original_data <- .
+    d <- chopped_pushup_hmms$classifier_data[[1]]
+
+    training_data_tsne <- d %.% {
+      ~ ~original_data <- .
       select(-S1, -S2, -time_step, -state)
       as.data.frame()
       column_to_rownames("idx")
       unique()
-      ~~ min_data <- .
+      ~ ~min_data <- .
       Rtsne::Rtsne()
       .$Y
       as.data.frame()
@@ -359,7 +347,9 @@ A t-SNE plot of the data made to train the classifiers.
         title = "t-SNE of push-up telemetry data"
       )
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+
+#### 4. Train a classifier with the HMM-prepared training data.
 
     # Append a prefix to each column name of a data frame.
     prefix_colnames <- function(d, prefix) {
@@ -374,12 +364,12 @@ A t-SNE plot of the data made to train the classifiers.
           bind_cols(data)
         roc_curve <- roc_curve(
           pred_data,
-          truth = factor(state), 
+          truth = factor(state),
           .pred_state1, .pred_state2, .pred_unknown
         )
         roc_auc_est <- roc_auc(
-          pred_data, 
-          truth = factor(state), 
+          pred_data,
+          truth = factor(state),
           .pred_state1, .pred_state2, .pred_unknown
         )
         return(tibble(
@@ -388,7 +378,7 @@ A t-SNE plot of the data made to train the classifiers.
           roc_auc = roc_auc_est$.estimate[[1]]
         ))
       }
-      
+
       train_pred <- f(fit, train_data) %>% prefix_colnames("train_")
       test_pred <- f(fit, test_data) %>% prefix_colnames("test_")
       bind_cols(train_pred, test_pred)
@@ -396,11 +386,10 @@ A t-SNE plot of the data made to train the classifiers.
 
     # Collect classification metrics.
     pushup_classification_metrics <- function(fit, train_data, test_data) {
-      
       metric_f <- function(pred_data, fxn) {
         fxn(pred_data, state, .pred_class)$.estimate[[1]]
       }
-      
+
       f <- function(fit, data) {
         pred_data <- predict(fit, data, type = "class") %>%
           bind_cols(data) %>%
@@ -418,60 +407,112 @@ A t-SNE plot of the data made to train the classifiers.
           npv = metric_f(pred_data, npv)
         )
       }
-      
+
       train_pred <- f(fit, train_data) %>% prefix_colnames("train_")
       test_pred <- f(fit, test_data) %>% prefix_colnames("test_")
       bind_cols(train_pred, test_pred)
     }
 
 
-    knn_assessment_workflow <- function(fit, train_data, test_data) {
+    classifier_assessment_workflow <- function(fit, train_data, test_data) {
       roc_results <- pushup_classification_roc(fit, train_data, test_data)
       class_results <- pushup_classification_metrics(fit, train_data, test_data)
       return(bind_cols(roc_results, class_results))
     }
 
-    run_knn_workflow <- function(data, prop = 0.75) {
-      
-      data_split <- initial_split(data, prop = prop, strata = "state")
+    run_classifier_workflow <- function(data, model_spec, prop = 0.75) {
 
-      pushup_recipe <- recipe(
-        state ~ x + y + z + pitch + roll + yaw, 
-        data = training_data
+      # Model recipe.
+      model_recipe <- recipe(
+        state ~ x + y + z + pitch + roll + yaw,
+        data = data
       )
-      
-      # Model specification.
-      knn_spec <- nearest_neighbor(mode = "classification") %>%
-        set_engine("kknn")
-      
+
       # TidyModels workflow.
-      pushup_workflow <- workflow() %>%
-        add_model(knn_spec) %>%
-        add_recipe(pushup_recipe)
-      
-      # Data.
+      classifer_workflow <- workflow() %>%
+        add_model(model_spec) %>%
+        add_recipe(model_recipe)
+
+      # Split data into training and testing.
+      data_split <- initial_split(data, prop = prop, strata = "state")
       train_data <- training(data_split)
       test_data <- testing(data_split)
-      
+
       # Fit the model.
-      pushup_knn_fit <- parsnip::fit(pushup_workflow, data = train_data)
+      fit_model <- parsnip::fit(classifer_workflow, data = train_data)
 
       # Get model assessment values.
-      model_assessment <- knn_assessment_workflow(
-        pushup_knn_fit, 
-        train_data, 
+      model_assessment <- classifier_assessment_workflow(
+        fit_model,
+        train_data,
         test_data
       )
       return(model_assessment)
     }
 
+    # KNN classifier.
+    run_knn_workflow <- function(data, neighbors = 5) {
+      # Model specification.
+      knn_spec <- nearest_neighbor(
+        mode = "classification",
+        neighbors = neighbors
+      ) %>%
+        set_engine("kknn")
+      run_classifier_workflow(data, knn_spec)
+    }
 
-    run_knn_workflow(training_data)
+    # Random forest classifier.
+    run_rf_workflow <- function(data, mtry = 3, trees = 100) {
+      rf_spec <- rand_forest(
+        mode = "classification",
+        mtry = mtry,
+        trees = trees,
+        min_n = 50
+      ) %>%
+        set_engine("ranger")
+      run_classifier_workflow(data, rf_spec)
+    }
 
-    #> # A tibble: 1 x 26
+    # Naive Bayes classifier.
+    run_nb_workflow <- function(data, smoothness = 5, Laplace = 5) {
+      nb_spec <- naive_Bayes(
+        mode = "classification",
+        smoothness = smoothness,
+        Laplace = Laplace
+      ) %>%
+        set_engine("klaR")
+      run_classifier_workflow(data, nb_spec)
+    }
+
+    # SVM classifier.
+    run_svm_workflow <- function(data, cost = 2, rbf_sigma = 1) {
+      svm_spec <- svm_rbf(
+        mode = "classification",
+        cost = cost,
+        rbf_sigma = rbf_sigma
+      ) %>%
+        set_engine("kernlab")
+      run_classifier_workflow(data, svm_spec)
+    }
+
+
+    eg_training_data <- chopped_pushup_hmms$classifier_data[[1]]
+
+    # Examples of running each model type.
+    bind_rows(
+      run_knn_workflow(eg_training_data),
+      run_rf_workflow(eg_training_data),
+      run_nb_workflow(eg_training_data),
+      run_svm_workflow(eg_training_data)
+    )
+
+    #> # A tibble: 4 x 26
     #>   train_pred_prob train_roc_curve train_roc_auc test_pred_prob test_roc_curve
     #>   <list>          <list>                  <dbl> <list>         <list>        
-    #> 1 <tibble [756 ×… <tibble [64 × …          1.00 <tibble [251 … <tibble [40 ×…
+    #> 1 <tibble [757 ×… <tibble [59 × …         1.00  <tibble [250 … <tibble [39 ×…
+    #> 2 <tibble [757 ×… <tibble [502 ×…         1.00  <tibble [250 … <tibble [248 …
+    #> 3 <tibble [757 ×… <tibble [2,136…         0.997 <tibble [250 … <tibble [732 …
+    #> 4 <tibble [757 ×… <tibble [2,154…         0.999 <tibble [250 … <tibble [723 …
     #> # … with 21 more variables: test_roc_auc <dbl>, train_pred_class <list>,
     #> #   train_sensitivity <dbl>, train_specificity <dbl>, train_precision <dbl>,
     #> #   train_mcc <dbl>, train_fmeasure <dbl>, train_accuracy <dbl>,
@@ -479,6 +520,84 @@ A t-SNE plot of the data made to train the classifiers.
     #> #   test_sensitivity <dbl>, test_specificity <dbl>, test_precision <dbl>,
     #> #   test_mcc <dbl>, test_fmeasure <dbl>, test_accuracy <dbl>, test_kap <dbl>,
     #> #   test_ppv <dbl>, test_npv <dbl>
+
+##### KNN hyperparameter tuning
+
+    n_rep <- 10
+    coarse_knn_k <- seq(2, 50, 5)
+    coarse_knn_k <- rep(coarse_knn_k, each = n_rep)
+
+    stash("coarse_tuning_knn", depends_on = "coarse_knn_k", {
+      coarse_tuning_knn <- map_dfr(
+        coarse_knn_k,
+        ~ run_knn_workflow(eg_training_data, neighbors = .x)
+      ) %>%
+        mutate(
+          neighbors = coarse_knn_k,
+          rep = rep(1:n_rep, n_distinct(coarse_knn_k))
+        )
+    })
+
+    #> Updating stash.
+
+    plot_classifier_tuning_results <- function(df, x) {
+      x_breaks <- df %>% pull({{ x }}) %>% unlist() %>% unique()
+      df %.%
+        {
+          select(
+            {{ x }}, rep,
+            train_roc_auc, test_roc_auc,
+            train_sensitivity:test_npv
+          )
+          select(-test_pred_class)
+          pivot_longer(-c({{ x }}, rep), names_to = "metric")
+          mutate(
+            test_train = ifelse(str_detect(metric, "^train"), "train", "test"),
+            metric = str_remove(metric, "^test_|^train_")
+          )
+          group_by({{ x }}, metric, test_train)
+          summarise(
+            value_stddev = sd(value),
+            value = mean(value)
+          )
+          ungroup()
+          mutate(
+            value_plus = value + value_stddev,
+            value_minus = value - value_stddev
+          )
+        } %>%
+        ggplot(aes({{ x }}, value, color = metric)) +
+        facet_wrap(~test_train, nrow = 2) +
+        geom_linerange(aes(ymin = value_minus, ymax = value_plus), alpha = 0.5) +
+        geom_line(aes(group = metric), alpha = 0.75) +
+        geom_point(alpha = 0.9) +
+        scale_x_continuous(breaks = x_breaks)
+    }
+
+    plot_classifier_tuning_results(coarse_tuning_knn, neighbors)
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+
+    n_rep <- 20
+    fine_knn_k <- seq(15, 31, 1)
+    fine_knn_k <- rep(fine_knn_k, each = n_rep)
+
+    stash("fine_tuning_knn", depends_on = "fine_knn_k", {
+      fine_tuning_knn <- map_dfr(
+        fine_knn_k,
+        ~ run_knn_workflow(eg_training_data, neighbors = .x)
+      ) %>%
+        mutate(
+          neighbors = fine_knn_k,
+          rep = rep(1:n_rep, n_distinct(fine_knn_k))
+        )
+    })
+
+    #> Loading stashed object.
+
+    plot_classifier_tuning_results(fine_tuning_knn, neighbors)
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 **To-Do**:
 
