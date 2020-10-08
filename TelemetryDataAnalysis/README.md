@@ -10,16 +10,37 @@ The states seems to capture the push-ups quite well.
 
 ![](graphs/pushup-hmm.png)
 
+## Classifier training pipeline
+
+The goal is to be able to automatically create training data for a classifier.
+A successful pipeline will require little-to-no user intervention and can theoretically be deployed to run on-device.
+
+### Data preparation
+
+Smoothing and scaling the data helps the HMM identify the states of a push-up.
+
+![](analysis/05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-1.png)
+
+### Auto-generated training data
+
+The HMM splits the raw data into data to train a classifier.
+
+![](analysis/05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-9-1.png)
+
+### Training a classifer
+
+Finally, a classifier can be trained on this automatically-generated training data.
+This portion of the pipeline is currently being developed, but it is already showing promising results.
+Below are the results of a coarse grid search of the 'neighbors' parameter of a kNN classifier.
+The top plot is on the testing split of the data, i.e. data that the model has never seen before.
+
+![](analysis/05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-12-1.png)
+
 ---
 
 ## To-Do
 
-### Apple watch backgrounding during data collection
+### Classifier selection
 
-The watch app is being backgrounded during data collection, cutting of the data stream.
-I need to initialize a workout session to access specific background privleges on the watch.
-
-### Fitting raw and messy data
-
-The data will always be capped by pre- and post- exercise noise.
-I do not know how the model will react to this portion of the data, though, in actual use, it will not be clipped off beforehand.
+I am currently in the process of training and testing various types of classifiers.
+Eventually either a single classifier needs to be chosen or an ensemble model needs to be built from the best classifiers.
