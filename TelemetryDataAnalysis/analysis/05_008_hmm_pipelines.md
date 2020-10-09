@@ -474,7 +474,7 @@ A t-SNE plot of the data made to train the classifiers.
     }
 
     # Naive Bayes classifier.
-    run_nb_workflow <- function(data, smoothness = 5, Laplace = 5) {
+    run_nb_workflow <- function(data, smoothness = 1, Laplace = 0) {
       nb_spec <- naive_Bayes(
         mode = "classification",
         smoothness = smoothness,
@@ -485,7 +485,7 @@ A t-SNE plot of the data made to train the classifiers.
     }
 
     # SVM classifier.
-    run_svm_workflow <- function(data, cost = 2, rbf_sigma = 1) {
+    run_svm_workflow <- function(data, cost = 1, rbf_sigma = 1) {
       svm_spec <- svm_rbf(
         mode = "classification",
         cost = cost,
@@ -511,7 +511,7 @@ A t-SNE plot of the data made to train the classifiers.
     #>   <list>          <list>                  <dbl> <list>         <list>        
     #> 1 <tibble [757 ×… <tibble [59 × …         1.00  <tibble [250 … <tibble [39 ×…
     #> 2 <tibble [757 ×… <tibble [502 ×…         1.00  <tibble [250 … <tibble [248 …
-    #> 3 <tibble [757 ×… <tibble [2,136…         0.997 <tibble [250 … <tibble [732 …
+    #> 3 <tibble [757 ×… <tibble [2,136…         0.999 <tibble [250 … <tibble [732 …
     #> 4 <tibble [757 ×… <tibble [2,154…         0.999 <tibble [250 … <tibble [723 …
     #> # … with 21 more variables: test_roc_auc <dbl>, train_pred_class <list>,
     #> #   train_sensitivity <dbl>, train_specificity <dbl>, train_precision <dbl>,
@@ -538,24 +538,29 @@ A t-SNE plot of the data made to train the classifiers.
         )
     })
 
-    #> Updating stash.
+    #> Loading stashed object.
 
-    plot_classifier_tuning_results <- function(df, x) {
-      x_breaks <- df %>% pull({{ x }}) %>% unlist() %>% unique()
+    plot_classifier_tuning_results <- function(df, x, ...) {
+      x_breaks <- df %>%
+        pull({{ x }}) %>%
+        unlist() %>%
+        unique()
+      other_cols <- rlang::enquos(...)
       df %.%
         {
           select(
-            {{ x }}, rep,
+            {{ x }}, !!!other_cols, rep,
             train_roc_auc, test_roc_auc,
             train_sensitivity:test_npv
           )
           select(-test_pred_class)
-          pivot_longer(-c({{ x }}, rep), names_to = "metric")
+          pivot_longer(-c({{ x }}, !!!other_cols, rep), names_to = "metric")
           mutate(
             test_train = ifelse(str_detect(metric, "^train"), "train", "test"),
+            test_train = factor(test_train, levels = c("train", "test")),
             metric = str_remove(metric, "^test_|^train_")
           )
-          group_by({{ x }}, metric, test_train)
+          group_by({{ x }}, !!!other_cols, metric, test_train)
           summarise(
             value_stddev = sd(value),
             value = mean(value)
@@ -574,7 +579,7 @@ A t-SNE plot of the data made to train the classifiers.
         scale_x_continuous(breaks = x_breaks)
     }
 
-    plot_classifier_tuning_results(coarse_tuning_knn, neighbors)
+    plot_classifier_tuning_results(coarse_tuning_knn, x = neighbors)
 
 ![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
@@ -599,11 +604,121 @@ A t-SNE plot of the data made to train the classifiers.
 
 ![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
-**To-Do**:
+##### Random forest hyperparameter tuning
 
--   continue with the practice sample started above:
-    -   look into using TidyModels for the following analysis
-    -   split the data into training and testing data
-    -   fit a few different classifiers with this training data and see
-        how well they do
-        -   decision forest, decision tree, kNN, SVM, naive Bayes
+    n_rep <- 10
+    coarse_rf_grid <- expand.grid(
+      mtry = 1:6,
+      trees = seq(10, 100, 10),
+      rep = 1:n_rep
+    )
+
+    stash("coarse_tuning_rf", depends_on = "coarse_rf_grid", {
+      coarse_tuning_rf <- pmap(coarse_rf_grid, function(mtry, trees, ...) {
+        run_rf_workflow(data = eg_training_data, mtry = mtry, trees = trees)
+      }) %>%
+        bind_rows() %>%
+        bind_cols(coarse_rf_grid)
+    })
+
+    #> Loading stashed object.
+
+    plot_classifier_tuning_results(coarse_tuning_rf, x = trees, mtry) +
+      facet_grid(mtry ~ test_train)
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+
+    n_rep <- 10
+    fine_rf_grid <- expand.grid(
+      mtry = 4,
+      trees = seq(2, 20, 2),
+      rep = 1:n_rep
+    )
+
+    stash("fine_tuning_rf", depends_on = "fine_rf_grid", {
+      fine_tuning_rf <- pmap(fine_rf_grid, function(mtry, trees, ...) {
+        run_rf_workflow(data = eg_training_data, mtry = mtry, trees = trees)
+      }) %>%
+        bind_rows() %>%
+        bind_cols(fine_rf_grid)
+    })
+
+    #> Loading stashed object.
+
+    plot_classifier_tuning_results(fine_tuning_rf, x = trees, mtry)
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+
+##### Naive Bayes hyperparameter tuning
+
+    n_rep <- 20
+    coarse_nb_grid <- expand_grid(
+      smoothness = seq(0.5, 3, 0.5),
+      rep = 1:n_rep
+    )
+
+    stash("coarse_tuning_nb", depends_on = "coarse_nb_grid", {
+      coarse_tuning_nb <- pmap(coarse_nb_grid, function(smoothness, ...) {
+        suppressWarnings(
+          run_nb_workflow(eg_training_data, smoothness = smoothness, Laplace = 0)
+        )
+      }) %>%
+        bind_rows() %>%
+        bind_cols(coarse_nb_grid)
+    })
+
+    #> Updating stash.
+
+    plot_classifier_tuning_results(coarse_tuning_nb, x = smoothness)
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+
+##### SVM hyperparameter tuning
+
+    n_rep <- 5
+    coarse_svm_grid <- expand_grid(
+      cost = seq(5, 20, 6),
+      rbf_sigma = 10^(seq(-3, 0, 1)),
+      rep = 1:n_rep
+    )
+
+    stash("coarse_tuning_svm", depends_on = "coarse_svm_grid", {
+      coarse_tuning_svm <- pmap(coarse_svm_grid, function(cost, rbf_sigma, ...) {
+        run_svm_workflow(eg_training_data, cost = cost, rbf_sigma = rbf_sigma)
+      }) %>%
+        bind_rows() %>%
+        bind_cols(coarse_svm_grid)
+    })
+
+    #> Loading stashed object.
+
+    plot_classifier_tuning_results(coarse_tuning_svm, x = cost, rbf_sigma) +
+      facet_grid(rbf_sigma ~ test_train, scales = "free_y")
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+
+    n_rep <- 10
+    fine_svm_grid <- expand_grid(
+      cost = seq(5, 20, 2),
+      rbf_sigma = 10^(seq(-3, 0, 1)),
+      rep = 1:n_rep
+    )
+
+    stash("fine_tuning_svm", depends_on = "fine_svm_grid", {
+      fine_tuning_svm <- pmap(fine_svm_grid, function(cost, rbf_sigma, ...) {
+        run_svm_workflow(eg_training_data, cost = cost, rbf_sigma = rbf_sigma)
+      }) %>%
+        bind_rows() %>%
+        bind_cols(fine_svm_grid)
+    })
+
+    #> Loading stashed object.
+
+    plot_classifier_tuning_results(fine_tuning_svm, x = cost, rbf_sigma) +
+      facet_grid(rbf_sigma ~ test_train)
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+
+#### Table of best classifier hyperparameters
+
+(TODO)
