@@ -20,32 +20,28 @@ Data
     }
 
 
-    running_fxn <- function(x, fxn, n = 5) {
-      y <- x
-      for (i in seq(1, length(x))) {
-        x_i <- c()
-        for (j in seq(-n, n)) {
-          idx <- i + j
-          if (idx < 1 | idx > length(x)) {
-            next
-          }
-          x_i <- c(x_i, x[[idx]])
-        }
-        y[[i]] <- fxn(x_i)
-      }
-      return(y)
-    }
-
-
     apply_smoothing_trans <- function(df,
                                       x = value,
                                       y = smooth_value,
                                       rolling_n = 10) {
+      
+      before_after = round(rolling_n / 2)
+      
       df %.% {
         group_by(axis, motion)
         mutate(
-          {{ y }} := running_fxn(abs({{ x }}), fxn = max, n = rolling_n),
-          {{ y }} := ksmooth(date, {{ y }}, kernel = "box")$y
+          {{ y }} := slider::slide_dbl(
+            {{ x }}, 
+            .f = ~ max(abs(.x)), 
+            .before = before_after, 
+            .after = before_after
+          ),
+          {{ y }} := slider::slide_dbl(
+            {{ y }},
+            .f = mean,
+            .before = 2,
+            .after = 2
+          )
         )
       }
     }
@@ -97,19 +93,17 @@ Pipeline \#1. Heuristic chop & simple HMM
 **Pipeline**
 
 1.  Chop the raw data within an IQR of the time steps to get just the
-    clena pushup data.
+    clean push-up data.
 2.  Use an HMM to identify the 2 states of the push-up.
-3.  Use the HMM to cut the chopped data into the two states of training
-    a classifier.
+3.  Use the HMM to cut the chopped data into the 3 states of a push-up
+    (one state as `unknown`).
 4.  Train an classifier on this training data.
 5.  Apply the classifier to the original data to test accuracy.
 
-**Experimental features**
+**Experimental**
 
-1.  The type of classifier to use.
-2.  Would it be possible to train the classifer with *3* classes, one
-    being “unknown” and having this be the very beginning and ending
-    data?
+-   A lot of experimentation will be needed to select the best
+    classification model and tune the model’s hyperparameters.
 
 ### Pipeline
 
@@ -194,11 +188,11 @@ Select only the time steps in the 30 and 70 percentiles.
       )
     }
 
-    #> converged at iteration 35 with logLik: 2013.841 
-    #> converged at iteration 33 with logLik: 3412.07 
-    #> converged at iteration 31 with logLik: 1992.361 
-    #> converged at iteration 32 with logLik: 3452.777 
-    #> converged at iteration 55 with logLik: 3122.072
+    #> converged at iteration 47 with logLik: 935.1952 
+    #> converged at iteration 15 with logLik: 2533.44 
+    #> converged at iteration 19 with logLik: 1009.4 
+    #> converged at iteration 20 with logLik: 2035.068 
+    #> converged at iteration 105 with logLik: 1837.033
 
     plot_telmetry_data <- function(df, x = value) {
       df %>%
@@ -313,11 +307,11 @@ probability of either state 1 or 2 is less than 0.90. Additional
     #> # A tibble: 5 x 4
     #>   workout_idx state1 state2 unknown
     #>         <int>  <int>  <int>   <int>
-    #> 1           1    299    355     353
-    #> 2           2    352    247     329
-    #> 3           3    322    398     387
-    #> 4           4    327    364     369
-    #> 5           5    430    348     413
+    #> 1           1    312    346     349
+    #> 2           2    361    248     319
+    #> 3           3    304    420     383
+    #> 4           4    384    308     368
+    #> 5           5    305    471     415
 
 A t-SNE plot of the data made to train the classifiers.
 
@@ -357,67 +351,71 @@ A t-SNE plot of the data made to train the classifiers.
       return(d)
     }
 
-    # Collect classification ROC results.
-    pushup_classification_roc <- function(fit, train_data, test_data) {
-      f <- function(fit, data) {
-        pred_data <- predict(fit, data, type = "prob") %>%
-          bind_cols(data)
-        roc_curve <- roc_curve(
-          pred_data,
-          truth = factor(state),
-          .pred_state1, .pred_state2, .pred_unknown
-        )
-        roc_auc_est <- roc_auc(
-          pred_data,
-          truth = factor(state),
-          .pred_state1, .pred_state2, .pred_unknown
-        )
-        return(tibble(
-          pred_prob = list(pred_data),
-          roc_curve = list(roc_curve),
-          roc_auc = roc_auc_est$.estimate[[1]]
-        ))
-      }
 
-      train_pred <- f(fit, train_data) %>% prefix_colnames("train_")
-      test_pred <- f(fit, test_data) %>% prefix_colnames("test_")
-      bind_cols(train_pred, test_pred)
+    # Collect classification ROC results.
+    pushup_classification_roc <- function(fit, data) {
+      pred_data <- predict(fit, data, type = "prob") %>%
+        bind_cols(data)
+      
+      roc_curve <- roc_curve(
+        pred_data,
+        truth = factor(state),
+        .pred_state1, .pred_state2, .pred_unknown
+      )
+      
+      roc_auc_est <- roc_auc(
+        pred_data,
+        truth = factor(state),
+        .pred_state1, .pred_state2, .pred_unknown
+      )
+      
+      tibble(
+        pred_prob = list(pred_data),
+        roc_curve = list(roc_curve),
+        roc_auc = roc_auc_est$.estimate[[1]]
+      )
     }
 
     # Collect classification metrics.
-    pushup_classification_metrics <- function(fit, train_data, test_data) {
+    pushup_classification_metrics <- function(fit, data) {
       metric_f <- function(pred_data, fxn) {
         fxn(pred_data, state, .pred_class)$.estimate[[1]]
       }
 
-      f <- function(fit, data) {
-        pred_data <- predict(fit, data, type = "class") %>%
-          bind_cols(data) %>%
-          mutate(state = factor(state))
-        tibble(
-          pred_class = list(pred_data),
-          sensitivity = metric_f(pred_data, sensitivity),
-          specificity = metric_f(pred_data, specificity),
-          precision = metric_f(pred_data, precision),
-          mcc = metric_f(pred_data, mcc),
-          fmeasure = metric_f(pred_data, f_meas),
-          accuracy = metric_f(pred_data, accuracy),
-          kap = metric_f(pred_data, kap),
-          ppv = metric_f(pred_data, ppv),
-          npv = metric_f(pred_data, npv)
-        )
-      }
-
-      train_pred <- f(fit, train_data) %>% prefix_colnames("train_")
-      test_pred <- f(fit, test_data) %>% prefix_colnames("test_")
-      bind_cols(train_pred, test_pred)
+      pred_data <- predict(fit, data, type = "class") %>%
+        bind_cols(data) %>%
+        mutate(state = factor(state))
+      
+      tibble(
+        pred_class = list(pred_data),
+        sensitivity = metric_f(pred_data, sensitivity),
+        specificity = metric_f(pred_data, specificity),
+        precision = metric_f(pred_data, precision),
+        mcc = metric_f(pred_data, mcc),
+        fmeasure = metric_f(pred_data, f_meas),
+        accuracy = metric_f(pred_data, accuracy),
+        kap = metric_f(pred_data, kap),
+        ppv = metric_f(pred_data, ppv),
+        npv = metric_f(pred_data, npv)
+      )
     }
 
 
     classifier_assessment_workflow <- function(fit, train_data, test_data) {
-      roc_results <- pushup_classification_roc(fit, train_data, test_data)
-      class_results <- pushup_classification_metrics(fit, train_data, test_data)
-      return(bind_cols(roc_results, class_results))
+      roc_results_train <- pushup_classification_roc(fit, train_data) %>% 
+        prefix_colnames("train_")
+      roc_results_test <- pushup_classification_roc(fit, test_data) %>% 
+        prefix_colnames("test_")
+      
+      class_results_train <- pushup_classification_metrics(fit, train_data) %>%
+        prefix_colnames("train_")
+      class_results_test <- pushup_classification_metrics(fit, test_data) %>%
+        prefix_colnames("test_")
+      
+      bind_cols(
+        roc_results_train, roc_results_test, 
+        class_results_train, class_results_test
+      )
     }
 
     run_classifier_workflow <- function(data, model_spec, prop = 0.75) {
@@ -447,8 +445,14 @@ A t-SNE plot of the data made to train the classifiers.
         train_data,
         test_data
       )
-      return(model_assessment)
+      
+      bind_cols(
+        tibble(fit_model = list(fit_model)),
+        model_assessment
+      )
     }
+
+Wrappers for four different classification model types.
 
     # KNN classifier.
     run_knn_workflow <- function(data, neighbors = 5) {
@@ -506,20 +510,86 @@ A t-SNE plot of the data made to train the classifiers.
       run_svm_workflow(eg_training_data)
     )
 
-    #> # A tibble: 4 x 26
-    #>   train_pred_prob train_roc_curve train_roc_auc test_pred_prob test_roc_curve
-    #>   <list>          <list>                  <dbl> <list>         <list>        
-    #> 1 <tibble [757 ×… <tibble [59 × …         1.00  <tibble [250 … <tibble [39 ×…
-    #> 2 <tibble [757 ×… <tibble [502 ×…         1.00  <tibble [250 … <tibble [248 …
-    #> 3 <tibble [757 ×… <tibble [2,136…         0.999 <tibble [250 … <tibble [732 …
-    #> 4 <tibble [757 ×… <tibble [2,154…         0.999 <tibble [250 … <tibble [723 …
-    #> # … with 21 more variables: test_roc_auc <dbl>, train_pred_class <list>,
-    #> #   train_sensitivity <dbl>, train_specificity <dbl>, train_precision <dbl>,
-    #> #   train_mcc <dbl>, train_fmeasure <dbl>, train_accuracy <dbl>,
-    #> #   train_kap <dbl>, train_ppv <dbl>, train_npv <dbl>, test_pred_class <list>,
-    #> #   test_sensitivity <dbl>, test_specificity <dbl>, test_precision <dbl>,
-    #> #   test_mcc <dbl>, test_fmeasure <dbl>, test_accuracy <dbl>, test_kap <dbl>,
-    #> #   test_ppv <dbl>, test_npv <dbl>
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 628
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 632
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 633
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 634
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 635
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 641
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 642
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 213
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 214
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 215
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 216
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 628
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 632
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 633
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 634
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 635
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 641
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 642
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 213
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 214
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 215
+
+    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
+    #> observation 216
+
+    #> # A tibble: 4 x 27
+    #>   fit_model train_pred_prob train_roc_curve train_roc_auc test_pred_prob
+    #>   <list>    <list>          <list>                  <dbl> <list>        
+    #> 1 <workflo… <tibble [756 ×… <tibble [56 × …         1     <tibble [251 …
+    #> 2 <workflo… <tibble [756 ×… <tibble [497 ×…         1.00  <tibble [251 …
+    #> 3 <workflo… <tibble [756 ×… <tibble [2,265…         0.997 <tibble [251 …
+    #> 4 <workflo… <tibble [756 ×… <tibble [2,271…         0.998 <tibble [251 …
+    #> # … with 22 more variables: test_roc_curve <list>, test_roc_auc <dbl>,
+    #> #   train_pred_class <list>, train_sensitivity <dbl>, train_specificity <dbl>,
+    #> #   train_precision <dbl>, train_mcc <dbl>, train_fmeasure <dbl>,
+    #> #   train_accuracy <dbl>, train_kap <dbl>, train_ppv <dbl>, train_npv <dbl>,
+    #> #   test_pred_class <list>, test_sensitivity <dbl>, test_specificity <dbl>,
+    #> #   test_precision <dbl>, test_mcc <dbl>, test_fmeasure <dbl>,
+    #> #   test_accuracy <dbl>, test_kap <dbl>, test_ppv <dbl>, test_npv <dbl>
 
 ##### KNN hyperparameter tuning
 
@@ -527,7 +597,7 @@ A t-SNE plot of the data made to train the classifiers.
     coarse_knn_k <- seq(2, 50, 5)
     coarse_knn_k <- rep(coarse_knn_k, each = n_rep)
 
-    stash("coarse_tuning_knn", depends_on = "coarse_knn_k", {
+    stash("coarse_tuning_knn", depends_on = c("eg_training_data", "coarse_knn_k"), {
       coarse_tuning_knn <- map_dfr(
         coarse_knn_k,
         ~ run_knn_workflow(eg_training_data, neighbors = .x)
@@ -587,7 +657,7 @@ A t-SNE plot of the data made to train the classifiers.
     fine_knn_k <- seq(15, 31, 1)
     fine_knn_k <- rep(fine_knn_k, each = n_rep)
 
-    stash("fine_tuning_knn", depends_on = "fine_knn_k", {
+    stash("fine_tuning_knn", depends_on = c("eg_training_data", "fine_knn_k"), {
       fine_tuning_knn <- map_dfr(
         fine_knn_k,
         ~ run_knn_workflow(eg_training_data, neighbors = .x)
@@ -613,7 +683,7 @@ A t-SNE plot of the data made to train the classifiers.
       rep = 1:n_rep
     )
 
-    stash("coarse_tuning_rf", depends_on = "coarse_rf_grid", {
+    stash("coarse_tuning_rf", depends_on = c("eg_training_data", "coarse_rf_grid"), {
       coarse_tuning_rf <- pmap(coarse_rf_grid, function(mtry, trees, ...) {
         run_rf_workflow(data = eg_training_data, mtry = mtry, trees = trees)
       }) %>%
@@ -630,12 +700,12 @@ A t-SNE plot of the data made to train the classifiers.
 
     n_rep <- 10
     fine_rf_grid <- expand.grid(
-      mtry = 4,
+      mtry = 1,
       trees = seq(2, 20, 2),
       rep = 1:n_rep
     )
 
-    stash("fine_tuning_rf", depends_on = "fine_rf_grid", {
+    stash("fine_tuning_rf", depends_on = c("eg_training_data", "fine_rf_grid"), {
       fine_tuning_rf <- pmap(fine_rf_grid, function(mtry, trees, ...) {
         run_rf_workflow(data = eg_training_data, mtry = mtry, trees = trees)
       }) %>%
@@ -657,7 +727,7 @@ A t-SNE plot of the data made to train the classifiers.
       rep = 1:n_rep
     )
 
-    stash("coarse_tuning_nb", depends_on = "coarse_nb_grid", {
+    stash("coarse_tuning_nb", depends_on = c("eg_training_data", "coarse_nb_grid"), {
       coarse_tuning_nb <- pmap(coarse_nb_grid, function(smoothness, ...) {
         suppressWarnings(
           run_nb_workflow(eg_training_data, smoothness = smoothness, Laplace = 0)
@@ -667,7 +737,7 @@ A t-SNE plot of the data made to train the classifiers.
         bind_cols(coarse_nb_grid)
     })
 
-    #> Updating stash.
+    #> Loading stashed object.
 
     plot_classifier_tuning_results(coarse_tuning_nb, x = smoothness)
 
@@ -682,7 +752,7 @@ A t-SNE plot of the data made to train the classifiers.
       rep = 1:n_rep
     )
 
-    stash("coarse_tuning_svm", depends_on = "coarse_svm_grid", {
+    stash("coarse_tuning_svm", depends_on = c("eg_training_data", "coarse_svm_grid"), {
       coarse_tuning_svm <- pmap(coarse_svm_grid, function(cost, rbf_sigma, ...) {
         run_svm_workflow(eg_training_data, cost = cost, rbf_sigma = rbf_sigma)
       }) %>%
@@ -704,7 +774,7 @@ A t-SNE plot of the data made to train the classifiers.
       rep = 1:n_rep
     )
 
-    stash("fine_tuning_svm", depends_on = "fine_svm_grid", {
+    stash("fine_tuning_svm", depends_on = c("eg_training_data", "fine_svm_grid"), {
       fine_tuning_svm <- pmap(fine_svm_grid, function(cost, rbf_sigma, ...) {
         run_svm_workflow(eg_training_data, cost = cost, rbf_sigma = rbf_sigma)
       }) %>%
@@ -721,4 +791,89 @@ A t-SNE plot of the data made to train the classifiers.
 
 #### Table of best classifier hyperparameters
 
-(TODO)
+| **Model**     | **Best Parameters**         |
+|---------------|-----------------------------|
+| kNN           | neighbors: 20               |
+| Random Forest | mtry: 1, trees: 16          |
+| Naive Bayes   | smoothness: 0.5, Laplace: 0 |
+| SVM           | cost: 20, rbf\_sigma: 1     |
+
+I have decided to drop the naive Bayes classifier from further
+experimentation as it tends to be a bit tricky to train and tune.
+
+#### Deciding on a classification model
+
+(In progress.)
+
+    get_fit_model <- function(model_type = c("knn", "rf", "svm"), data) {
+      model_type <- str_to_lower(model_type[[1]])
+      model_data <- 
+      if (model_type == "knn") {
+        return(run_knn_workflow(eg_training_data, neighbors = 20))
+      } else if (model_type == "rf") {
+        return(run_rf_workflow(eg_training_data, mtry = 1, trees = 16))
+      } else if (model_type == "svm") {
+        return(run_svm_workflow(eg_training_data, cost = 20, rbf_sigma = 1))
+      } else {
+        stop(glue::glue("Unrecognized model type: {model_type}"))
+      }
+    }
+
+    optimal_models <- expand_grid(
+      train_workout_idx = seq(1, max(chopped_pushup_hmms$workout_idx)),
+      model_type = c("knn", "rf", "svm")
+    ) %.%
+    {
+      left_join(
+        chopped_pushup_hmms %>% select(workout_idx, classifier_data),
+        by = c("train_workout_idx" = "workout_idx")
+      )
+      slice(1:3)
+      mutate(model_res = map2(model_type, classifier_data, get_fit_model))
+    }
+
+
+    optimal_models %.% {
+      mutate(
+        fit_model = map(model_res, ~ .x$fit_model[[1]]),
+        training_metrics = map(model_res, ~.x %>% select(-fit_model))
+      )
+      select(-model_res, -classifier_data)
+      add_column(test_workout_idx = list(seq(1, max(chopped_pushup_hmms$workout_idx))))
+      unnest(test_workout_idx)
+      left_join(
+        chopped_pushup_hmms %>% select(workout_idx, classifier_data),
+        by = c("test_workout_idx" = "workout_idx")
+      )
+      group_by(train_workout_idx, model_type, test_workout_idx)
+      mutate(
+        testing_metrics = map2(fit_model, classifier_data, pushup_classification_metrics),
+        testing_roc = map2(fit_model, classifier_data, pushup_classification_roc)
+      )
+      unnest(testing_metrics)
+      unnest(testing_roc)
+    }
+
+    #> # A tibble: 15 x 19
+    #> # Groups:   train_workout_idx, model_type, test_workout_idx [15]
+    #>    train_workout_i… model_type fit_model training_metrics test_workout_idx
+    #>               <int> <chr>      <list>    <list>                      <int>
+    #>  1                1 knn        <workflo… <tibble [1 × 26…                1
+    #>  2                1 knn        <workflo… <tibble [1 × 26…                2
+    #>  3                1 knn        <workflo… <tibble [1 × 26…                3
+    #>  4                1 knn        <workflo… <tibble [1 × 26…                4
+    #>  5                1 knn        <workflo… <tibble [1 × 26…                5
+    #>  6                1 rf         <workflo… <tibble [1 × 26…                1
+    #>  7                1 rf         <workflo… <tibble [1 × 26…                2
+    #>  8                1 rf         <workflo… <tibble [1 × 26…                3
+    #>  9                1 rf         <workflo… <tibble [1 × 26…                4
+    #> 10                1 rf         <workflo… <tibble [1 × 26…                5
+    #> 11                1 svm        <workflo… <tibble [1 × 26…                1
+    #> 12                1 svm        <workflo… <tibble [1 × 26…                2
+    #> 13                1 svm        <workflo… <tibble [1 × 26…                3
+    #> 14                1 svm        <workflo… <tibble [1 × 26…                4
+    #> 15                1 svm        <workflo… <tibble [1 × 26…                5
+    #> # … with 14 more variables: classifier_data <list>, pred_class <list>,
+    #> #   sensitivity <dbl>, specificity <dbl>, precision <dbl>, mcc <dbl>,
+    #> #   fmeasure <dbl>, accuracy <dbl>, kap <dbl>, ppv <dbl>, npv <dbl>,
+    #> #   pred_prob <list>, roc_curve <list>, roc_auc <dbl>
