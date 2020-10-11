@@ -15,7 +15,7 @@ theme_set(theme_minimal())
 set.seed(0)
 ```
 
-Below, I try out a few HMM-based modeling and prediciton pipelines.
+Below, I try out a HMM-based modeling and prediction pipeline.
 
 ## Data
 
@@ -61,7 +61,6 @@ apply_smoothing_trans <- function(df,
 }
 
 
-
 transform_pushup_data <- function(df) {
   df %>%
     apply_scale_trans() %>%
@@ -91,26 +90,24 @@ pushup_data <- tibble(filename = get_data_file_names(data_dir)) %.% {
 pushup_data
 ```
 
-
-## Pipeline #1. Heuristic chop & simple HMM
-
-### Overview
+## Overview
 
 **Pipeline**
 
 1. Chop the raw data within an IQR of the time steps to get just the clean push-up data.
 2. Use an HMM to identify the 2 states of the push-up.
 3. Use the HMM to cut the chopped data into the 3 states of a push-up (one state as `unknown`).
-4. Train an classifier on this training data.
-5. Apply the classifier to the original data to test accuracy.
+4. Train a classifier on this training data.
+5. Apply the classifier to new data as it is being collected.
 
-**Experimental**
+**Experimentation**
 
 - A lot of experimentation will be needed to select the best classification model and tune the model's hyperparameters.
 
-### Pipeline
+## Pipeline
 
-#### 1. Chop the data
+
+### 1. Chop the data
 
 Select only the time steps in the 30 and 70 percentiles.
 
@@ -134,7 +131,8 @@ chopped_pushup_data %>%
   geom_line(aes(color = axis))
 ```
 
-#### 2. Train HMM
+
+### 2. Train HMM
 
 ```{r}
 nest_pushup_exercises <- function(df) {
@@ -165,12 +163,12 @@ construct_pushup_hmm <- function(d, nstates = 2) {
       roll ~ 1,
       yaw ~ 1
     ),
+    data = d,
     nstates = nstates,
     family = list(
       gaussian(), gaussian(), gaussian(),
       gaussian(), gaussian(), gaussian()
-    ),
-    data = d
+    )
   )
 }
 
@@ -234,14 +232,23 @@ chopped_pushup_hmms %>%
   mutate(a = walk2(data, fit, plot_hmm_fit, data_x = smooth_value))
 ```
 
-#### 3. Prepare training data with the HMM
+For the purposes of this exploration of training processes, I need the states of the HMMs to be synchronized.
+The vector `DATASETS_TO_REVERSE_STATES` has the indices of fit models that need to have their predicted states flipped to match the first model's state assignments.
+
+```{r}
+DATASETS_TO_REVERSE_STATES <- c(3, 5, 6)
+```
+
+
+### 3. Prepare training data with the HMM
 
 The HMM segments the data into the three states: `state1`, `state2`, and `unknown`.
 The `"unknown"` state is when the HMM believes that the probability of either state 1 or 2 is less than 0.90.
-Additional `unknown` data is provided by takign the edges of the time series data (the data before the push-ups begin).
+Additional `unknown` data is provided by taking the edges of the time series data (the data before the push-ups begin).
 
 ```{r}
-chop_data_with_hmm <- function(fit,
+chop_data_with_hmm <- function(workout_idx,
+                               fit,
                                wide_data,
                                full_data,
                                prob_cutoff = 0.9,
@@ -254,6 +261,17 @@ chop_data_with_hmm <- function(fit,
       S2 > prob_cutoff ~ "state2",
       TRUE ~ "unknown"
     ))
+  }
+  
+  if (workout_idx %in% DATASETS_TO_REVERSE_STATES) {
+    message("Flipping state assignments.")
+    training_data_1 <- training_data_1 %.% {
+      mutate(state = case_when(
+        state == "state1" ~ "state2",
+        state == "state2" ~ "state1",
+        TRUE ~ state
+      ))
+    }
   }
 
   training_data_2 <- full_data %.% {
@@ -319,7 +337,7 @@ training_data_tsne %>%
   )
 ```
 
-#### 4. Train a classifier with the HMM-prepared training data.
+### 4. Train a classifier with the HMM-prepared training data.
 
 ```{r}
 # Append a prefix to each column name of a data frame.
@@ -490,7 +508,7 @@ bind_rows(
 )
 ```
 
-##### KNN hyperparameter tuning
+#### KNN hyperparameter tuning
 
 ```{r}
 n_rep <- 10
@@ -570,7 +588,7 @@ stash("fine_tuning_knn", depends_on = c("eg_training_data", "fine_knn_k"), {
 plot_classifier_tuning_results(fine_tuning_knn, neighbors)
 ```
 
-##### Random forest hyperparameter tuning
+#### Random forest hyperparameter tuning
 
 ```{r}
 n_rep <- 10
@@ -613,7 +631,7 @@ stash("fine_tuning_rf", depends_on = c("eg_training_data", "fine_rf_grid"), {
 plot_classifier_tuning_results(fine_tuning_rf, x = trees, mtry)
 ```
 
-##### Naive Bayes hyperparameter tuning
+#### Naive Bayes hyperparameter tuning
 
 ```{r}
 n_rep <- 20
@@ -635,7 +653,7 @@ stash("coarse_tuning_nb", depends_on = c("eg_training_data", "coarse_nb_grid"), 
 plot_classifier_tuning_results(coarse_tuning_nb, x = smoothness)
 ```
 
-##### SVM hyperparameter tuning
+#### SVM hyperparameter tuning
 
 ```{r}
 n_rep <- 5
@@ -677,7 +695,7 @@ plot_classifier_tuning_results(fine_tuning_svm, x = cost, rbf_sigma) +
   facet_grid(rbf_sigma ~ test_train)
 ```
 
-#### Table of best classifier hyperparameters
+### Table of best classifier hyperparameters
 
 | **Model**     | **Best Parameters**         |
 |---------------|-----------------------------|
@@ -688,7 +706,7 @@ plot_classifier_tuning_results(fine_tuning_svm, x = cost, rbf_sigma) +
 
 I have decided to drop the naive Bayes classifier from further experimentation as it tends to be a bit tricky to train and tune.
 
-#### Deciding on a classification model
+### Deciding on a classification model
 
 (In progress.)
 
@@ -708,40 +726,164 @@ get_fit_model <- function(model_type = c("knn", "rf", "svm"), data) {
   }
 }
 
-optimal_models <- expand_grid(
-  train_workout_idx = seq(1, max(chopped_pushup_hmms$workout_idx)),
-  model_type = c("knn", "rf", "svm")
-) %.%
+
+stash(
+  "optimal_models_cross_validation", 
+  depends_on = "chopped_pushup_hmms", 
 {
-  left_join(
-    chopped_pushup_hmms %>% select(workout_idx, classifier_data),
-    by = c("train_workout_idx" = "workout_idx")
+  optimal_models_cross_validation <- expand_grid(
+    train_workout_idx = seq(1, max(chopped_pushup_hmms$workout_idx)),
+    model_type = c("knn", "rf", "svm")
+  ) %.%
+  {
+    left_join(
+      chopped_pushup_hmms %>% select(workout_idx, classifier_data),
+      by = c("train_workout_idx" = "workout_idx")
+    )
+    mutate(
+      model_res = map2(model_type, classifier_data, get_fit_model),
+      fit_model = map(model_res, ~ .x$fit_model[[1]]),
+      training_metrics = map(model_res, ~.x %>% select(-fit_model))
+    )
+    select(-model_res, -classifier_data)
+    add_column(test_workout_idx = list(seq(1, max(chopped_pushup_hmms$workout_idx))))
+    unnest(test_workout_idx)
+    left_join(
+      chopped_pushup_hmms %>% select(workout_idx, classifier_data),
+      by = c("test_workout_idx" = "workout_idx")
+    )
+    group_by(train_workout_idx, model_type, test_workout_idx)
+    mutate(
+      testing_metrics = map2(fit_model, classifier_data, pushup_classification_metrics),
+      testing_roc = map2(fit_model, classifier_data, pushup_classification_roc)
+    )
+    unnest(testing_metrics)
+    unnest(testing_roc)
+  }
+})
+```
+```{r}
+optimal_models_cross_validation %.% {
+  select(
+    train_workout_idx, model_type, test_workout_idx,
+    sensitivity, specificity, precision, accuracy, roc_auc
   )
-  slice(1:3)
-  mutate(model_res = map2(model_type, classifier_data, get_fit_model))
-}
-
-
-optimal_models %.% {
+  pivot_longer(
+    -c(train_workout_idx, model_type, test_workout_idx),
+    names_to = "metric", 
+    values_to = "value"
+  )
+  filter(train_workout_idx != test_workout_idx)
+  group_by(train_workout_idx, model_type, metric)
+  summarise(
+    avg_value = mean(value),
+    sd_value = sd(value)
+  )
+  ungroup()
   mutate(
-    fit_model = map(model_res, ~ .x$fit_model[[1]]),
-    training_metrics = map(model_res, ~.x %>% select(-fit_model))
+    value_up = avg_value + sd_value,
+    value_dn = avg_value - sd_value,
+    train_workout_idx = glue("training\nwrkt #{train_workout_idx}")
   )
-  select(-model_res, -classifier_data)
-  add_column(test_workout_idx = list(seq(1, max(chopped_pushup_hmms$workout_idx))))
-  unnest(test_workout_idx)
-  left_join(
-    chopped_pushup_hmms %>% select(workout_idx, classifier_data),
-    by = c("test_workout_idx" = "workout_idx")
+} %>% 
+  ggplot(aes(metric, avg_value)) +
+  facet_grid(train_workout_idx ~ model_type) +
+  geom_line(group = "a") +
+  geom_linerange(
+    aes(ymin = value_dn, ymax = value_up), 
+    alpha = 1
+  ) +
+  geom_point() +
+  scale_x_discrete(expand = c(0.07, 0.07)) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0.02, 0.02)),
+  ) +
+  theme(
+    axis.text.x = element_text(angle = 35, hjust = 1)
+  ) +
+  labs(
+    x = NULL,
+    y = "average value"
   )
-  group_by(train_workout_idx, model_type, test_workout_idx)
-  mutate(
-    testing_metrics = map2(fit_model, classifier_data, pushup_classification_metrics),
-    testing_roc = map2(fit_model, classifier_data, pushup_classification_roc)
-  )
-  unnest(testing_metrics)
-  unnest(testing_roc)
-}
 ```
 
+```{r}
+optimal_models_cross_validation %.% {
+  filter(train_workout_idx != test_workout_idx)
+  select(train_workout_idx, model_type, test_workout_idx,
+         sensitivity, specificity, precision, accuracy, roc_auc, mcc)
+  pivot_longer(
+    -c(train_workout_idx, model_type, test_workout_idx),
+    names_to = "metric",
+    values_to = "value"
+  )
+} %>%
+  ggplot(aes(x = model_type, y = value)) +
+  facet_wrap(~ metric, nrow = 2, scales = "free") +
+  geom_boxplot(aes(color = model_type), outlier.shape = NA) +
+  geom_jitter(aes(color = model_type), height = 0, width = 0.3, alpha = 0.3)
+```
 
+```{r}
+optimal_models_cross_validation %.% {
+  select(
+    train_workout_idx, model_type, test_workout_idx,
+    roc_curve
+  )
+  unnest(roc_curve)
+  mutate(
+    line_group = paste(train_workout_idx, test_workout_idx),
+    train_is_test = train_workout_idx == test_workout_idx
+  )
+} %>%
+  ggplot(aes(1-specificity, sensitivity)) +
+  facet_grid(.level ~ model_type) +
+  geom_line(
+    aes(
+      group = line_group, 
+      color = factor(test_workout_idx), 
+      lty = train_is_test
+    ), 
+    alpha = 0.5
+  ) +
+  scale_color_brewer(
+    type = "qual", 
+    palette = "Dark2", 
+    guide = FALSE
+  ) +
+  scale_linetype_manual(
+    values = c("TRUE" = 2, "FALSE" = 1), 
+    guide = FALSE
+  ) +
+  labs(
+    x = "1 - specificity",
+    y = "sensitivity",
+    title = "ROC of different model types",
+    subtitle = "The colors indicate different workout data sets and the dashed lines are when\nthe model was trained on that workout data set."
+  )
+```
+
+### 5. Applying the trained model to new data
+
+This step will require a more refined pipeline than I have developed in this notebook.
+I have skipped it here, but it will be in the next one.
+
+---
+
+## Conclusions
+
+### Data processing
+
+I think smoothing and scaling the data is required for the HMM and likely helps the classifiers.
+I need to better account for how new data will be collected and classified in real time.
+For example, the training data's mean and standard deviation will need to be stored for scaling the new data.
+
+### HMM
+
+I need to remember that the states that the HMM identifies need to be mapped to the states of a push-up.
+The chopping by the HMM and addition of "unknown" data worked quite well.
+
+### Classifier models
+
+I would recommend moving forward with the random forest.
+It outperformed the kNN and SVM classifiers on most metrics and is the most consistent across data sets and on new, unseen data.

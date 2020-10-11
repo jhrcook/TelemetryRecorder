@@ -1,7 +1,7 @@
 Hidden Markov Model-based learning pipelines
 ================
 
-Below, I try out a few HMM-based modeling and prediciton pipelines.
+Below, I try out a HMM-based modeling and prediction pipeline.
 
 Data
 ----
@@ -47,7 +47,6 @@ Data
     }
 
 
-
     transform_pushup_data <- function(df) {
       df %>%
         apply_scale_trans() %>%
@@ -76,7 +75,7 @@ Data
 
     pushup_data
 
-    #> # A tibble: 5 x 5
+    #> # A tibble: 6 x 5
     #>   workout_idx exercise reps  date                data                 
     #>         <int> <chr>    <chr> <dttm>              <list>               
     #> 1           1 Push-Ups 10    2020-10-03 17:43:59 <tibble [10,086 × 7]>
@@ -84,11 +83,10 @@ Data
     #> 3           3 Push-Ups 10    2020-10-04 13:25:57 <tibble [11,082 × 7]>
     #> 4           4 Push-Ups 10    2020-10-05 12:36:09 <tibble [10,596 × 7]>
     #> 5           5 Push-Ups 10    2020-10-05 12:36:49 <tibble [11,898 × 7]>
+    #> 6           6 Push-Ups 10    2020-10-11 08:43:16 <tibble [10,830 × 7]>
 
-Pipeline \#1. Heuristic chop & simple HMM
------------------------------------------
-
-### Overview
+Overview
+--------
 
 **Pipeline**
 
@@ -97,17 +95,18 @@ Pipeline \#1. Heuristic chop & simple HMM
 2.  Use an HMM to identify the 2 states of the push-up.
 3.  Use the HMM to cut the chopped data into the 3 states of a push-up
     (one state as `unknown`).
-4.  Train an classifier on this training data.
-5.  Apply the classifier to the original data to test accuracy.
+4.  Train a classifier on this training data.
+5.  Apply the classifier to new data as it is being collected.
 
-**Experimental**
+**Experimentation**
 
 -   A lot of experimentation will be needed to select the best
     classification model and tune the model’s hyperparameters.
 
-### Pipeline
+Pipeline
+--------
 
-#### 1. Chop the data
+### 1. Chop the data
 
 Select only the time steps in the 30 and 70 percentiles.
 
@@ -124,7 +123,7 @@ Select only the time steps in the 30 and 70 percentiles.
       summarise(n_datapoints = n_distinct(idx)) %>%
       ungroup()
 
-    #> # A tibble: 5 x 2
+    #> # A tibble: 6 x 2
     #>   workout_idx n_datapoints
     #>         <int>        <int>
     #> 1           1          671
@@ -132,6 +131,7 @@ Select only the time steps in the 30 and 70 percentiles.
     #> 3           3          737
     #> 4           4          706
     #> 5           5          793
+    #> 6           6          721
 
     chopped_pushup_data %>%
       ggplot(aes(x = time_step, y = smooth_value)) +
@@ -140,7 +140,7 @@ Select only the time steps in the 30 and 70 percentiles.
 
 ![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
 
-#### 2. Train HMM
+### 2. Train HMM
 
     nest_pushup_exercises <- function(df) {
       df %>%
@@ -168,12 +168,12 @@ Select only the time steps in the 30 and 70 percentiles.
           roll ~ 1,
           yaw ~ 1
         ),
+        data = d,
         nstates = nstates,
         family = list(
           gaussian(), gaussian(), gaussian(),
           gaussian(), gaussian(), gaussian()
-        ),
-        data = d
+        )
       )
     }
 
@@ -192,7 +192,8 @@ Select only the time steps in the 30 and 70 percentiles.
     #> converged at iteration 15 with logLik: 2533.44 
     #> converged at iteration 19 with logLik: 1009.4 
     #> converged at iteration 20 with logLik: 2035.068 
-    #> converged at iteration 105 with logLik: 1837.033
+    #> converged at iteration 105 with logLik: 1837.033 
+    #> converged at iteration 15 with logLik: 1577.959
 
     plot_telmetry_data <- function(df, x = value) {
       df %>%
@@ -240,9 +241,9 @@ Select only the time steps in the 30 and 70 percentiles.
     chopped_pushup_hmms %>%
       mutate(a = walk2(data, fit, plot_hmm_fit, data_x = smooth_value))
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-3.png)<!-- -->![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-4.png)<!-- -->![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-5.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-2.png)<!-- -->![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-3.png)<!-- -->![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-4.png)<!-- -->![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-5.png)<!-- -->![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-5-6.png)<!-- -->
 
-    #> # A tibble: 5 x 9
+    #> # A tibble: 6 x 9
     #>   workout_idx exercise reps  date                data  wide_data model fit  
     #>         <int> <chr>    <chr> <dttm>              <lis> <list>    <lis> <lis>
     #> 1           1 Push-Ups 10    2020-10-03 17:43:59 <tib… <tibble … <dep… <dpm…
@@ -250,17 +251,27 @@ Select only the time steps in the 30 and 70 percentiles.
     #> 3           3 Push-Ups 10    2020-10-04 13:25:57 <tib… <tibble … <dep… <dpm…
     #> 4           4 Push-Ups 10    2020-10-05 12:36:09 <tib… <tibble … <dep… <dpm…
     #> 5           5 Push-Ups 10    2020-10-05 12:36:49 <tib… <tibble … <dep… <dpm…
+    #> 6           6 Push-Ups 10    2020-10-11 08:43:16 <tib… <tibble … <dep… <dpm…
     #> # … with 1 more variable: a <list>
 
-#### 3. Prepare training data with the HMM
+For the purposes of this exploration of training processes, I need the
+states of the HMMs to be synchronized. The vector
+`DATASETS_TO_REVERSE_STATES` has the indices of fit models that need to
+have their predicted states flipped to match the first model’s state
+assignments.
+
+    DATASETS_TO_REVERSE_STATES <- c(3, 5, 6)
+
+### 3. Prepare training data with the HMM
 
 The HMM segments the data into the three states: `state1`, `state2`, and
 `unknown`. The `"unknown"` state is when the HMM believes that the
 probability of either state 1 or 2 is less than 0.90. Additional
-`unknown` data is provided by takign the edges of the time series data
+`unknown` data is provided by taking the edges of the time series data
 (the data before the push-ups begin).
 
-    chop_data_with_hmm <- function(fit,
+    chop_data_with_hmm <- function(workout_idx,
+                                   fit,
                                    wide_data,
                                    full_data,
                                    prob_cutoff = 0.9,
@@ -273,6 +284,17 @@ probability of either state 1 or 2 is less than 0.90. Additional
           S2 > prob_cutoff ~ "state2",
           TRUE ~ "unknown"
         ))
+      }
+      
+      if (workout_idx %in% DATASETS_TO_REVERSE_STATES) {
+        message("Flipping state assignments.")
+        training_data_1 <- training_data_1 %.% {
+          mutate(state = case_when(
+            state == "state1" ~ "state2",
+            state == "state2" ~ "state1",
+            TRUE ~ state
+          ))
+        }
       }
 
       training_data_2 <- full_data %.% {
@@ -297,6 +319,10 @@ probability of either state 1 or 2 is less than 0.90. Additional
 
     chopped_pushup_hmms$classifier_data <- pmap(chopped_pushup_hmms, chop_data_with_hmm)
 
+    #> Flipping state assignments.
+    #> Flipping state assignments.
+    #> Flipping state assignments.
+
     chopped_pushup_hmms %.% {
       select(workout_idx, classifier_data)
       unnest(classifier_data)
@@ -304,14 +330,15 @@ probability of either state 1 or 2 is less than 0.90. Additional
       pivot_wider(-state, names_from = "state", values_from = "n")
     }
 
-    #> # A tibble: 5 x 4
+    #> # A tibble: 6 x 4
     #>   workout_idx state1 state2 unknown
     #>         <int>  <int>  <int>   <int>
     #> 1           1    312    346     349
     #> 2           2    361    248     319
-    #> 3           3    304    420     383
+    #> 3           3    420    304     383
     #> 4           4    384    308     368
-    #> 5           5    305    471     415
+    #> 5           5    471    305     415
+    #> 6           6    427    280     376
 
 A t-SNE plot of the data made to train the classifiers.
 
@@ -341,9 +368,9 @@ A t-SNE plot of the data made to train the classifiers.
         title = "t-SNE of push-up telemetry data"
       )
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
-#### 4. Train a classifier with the HMM-prepared training data.
+### 4. Train a classifier with the HMM-prepared training data.
 
     # Append a prefix to each column name of a data frame.
     prefix_colnames <- function(d, prefix) {
@@ -511,78 +538,54 @@ Wrappers for four different classification model types.
     )
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 628
+    #> observation 624
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 632
+    #> observation 630
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 633
+    #> observation 631
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 634
+    #> observation 639
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 635
+    #> observation 217
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 641
+    #> observation 218
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 642
+    #> observation 219
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 213
+    #> observation 624
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 214
+    #> observation 630
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 215
+    #> observation 631
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 216
+    #> observation 639
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 628
+    #> observation 217
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 632
+    #> observation 218
 
     #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 633
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 634
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 635
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 641
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 642
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 213
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 214
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 215
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 216
+    #> observation 219
 
     #> # A tibble: 4 x 27
     #>   fit_model train_pred_prob train_roc_curve train_roc_auc test_pred_prob
     #>   <list>    <list>          <list>                  <dbl> <list>        
-    #> 1 <workflo… <tibble [756 ×… <tibble [56 × …         1     <tibble [251 …
-    #> 2 <workflo… <tibble [756 ×… <tibble [497 ×…         1.00  <tibble [251 …
-    #> 3 <workflo… <tibble [756 ×… <tibble [2,265…         0.997 <tibble [251 …
-    #> 4 <workflo… <tibble [756 ×… <tibble [2,271…         0.998 <tibble [251 …
+    #> 1 <workflo… <tibble [756 ×… <tibble [56 × …         1.00  <tibble [251 …
+    #> 2 <workflo… <tibble [756 ×… <tibble [558 ×…         1.00  <tibble [251 …
+    #> 3 <workflo… <tibble [756 ×… <tibble [2,268…         0.998 <tibble [251 …
+    #> 4 <workflo… <tibble [756 ×… <tibble [2,274…         0.999 <tibble [251 …
     #> # … with 22 more variables: test_roc_curve <list>, test_roc_auc <dbl>,
     #> #   train_pred_class <list>, train_sensitivity <dbl>, train_specificity <dbl>,
     #> #   train_precision <dbl>, train_mcc <dbl>, train_fmeasure <dbl>,
@@ -591,7 +594,7 @@ Wrappers for four different classification model types.
     #> #   test_precision <dbl>, test_mcc <dbl>, test_fmeasure <dbl>,
     #> #   test_accuracy <dbl>, test_kap <dbl>, test_ppv <dbl>, test_npv <dbl>
 
-##### KNN hyperparameter tuning
+#### KNN hyperparameter tuning
 
     n_rep <- 10
     coarse_knn_k <- seq(2, 50, 5)
@@ -651,7 +654,7 @@ Wrappers for four different classification model types.
 
     plot_classifier_tuning_results(coarse_tuning_knn, x = neighbors)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
     n_rep <- 20
     fine_knn_k <- seq(15, 31, 1)
@@ -672,9 +675,9 @@ Wrappers for four different classification model types.
 
     plot_classifier_tuning_results(fine_tuning_knn, neighbors)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
-##### Random forest hyperparameter tuning
+#### Random forest hyperparameter tuning
 
     n_rep <- 10
     coarse_rf_grid <- expand.grid(
@@ -696,7 +699,7 @@ Wrappers for four different classification model types.
     plot_classifier_tuning_results(coarse_tuning_rf, x = trees, mtry) +
       facet_grid(mtry ~ test_train)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
     n_rep <- 10
     fine_rf_grid <- expand.grid(
@@ -717,9 +720,9 @@ Wrappers for four different classification model types.
 
     plot_classifier_tuning_results(fine_tuning_rf, x = trees, mtry)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
-##### Naive Bayes hyperparameter tuning
+#### Naive Bayes hyperparameter tuning
 
     n_rep <- 20
     coarse_nb_grid <- expand_grid(
@@ -741,9 +744,9 @@ Wrappers for four different classification model types.
 
     plot_classifier_tuning_results(coarse_tuning_nb, x = smoothness)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
-##### SVM hyperparameter tuning
+#### SVM hyperparameter tuning
 
     n_rep <- 5
     coarse_svm_grid <- expand_grid(
@@ -765,7 +768,7 @@ Wrappers for four different classification model types.
     plot_classifier_tuning_results(coarse_tuning_svm, x = cost, rbf_sigma) +
       facet_grid(rbf_sigma ~ test_train, scales = "free_y")
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
     n_rep <- 10
     fine_svm_grid <- expand_grid(
@@ -787,9 +790,9 @@ Wrappers for four different classification model types.
     plot_classifier_tuning_results(fine_tuning_svm, x = cost, rbf_sigma) +
       facet_grid(rbf_sigma ~ test_train)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
 
-#### Table of best classifier hyperparameters
+### Table of best classifier hyperparameters
 
 | **Model**     | **Best Parameters**         |
 |---------------|-----------------------------|
@@ -801,7 +804,7 @@ Wrappers for four different classification model types.
 I have decided to drop the naive Bayes classifier from further
 experimentation as it tends to be a bit tricky to train and tune.
 
-#### Deciding on a classification model
+### Deciding on a classification model
 
 (In progress.)
 
@@ -819,61 +822,171 @@ experimentation as it tends to be a bit tricky to train and tune.
       }
     }
 
-    optimal_models <- expand_grid(
-      train_workout_idx = seq(1, max(chopped_pushup_hmms$workout_idx)),
-      model_type = c("knn", "rf", "svm")
-    ) %.%
+
+    stash(
+      "optimal_models_cross_validation", 
+      depends_on = "chopped_pushup_hmms", 
     {
-      left_join(
-        chopped_pushup_hmms %>% select(workout_idx, classifier_data),
-        by = c("train_workout_idx" = "workout_idx")
+      optimal_models_cross_validation <- expand_grid(
+        train_workout_idx = seq(1, max(chopped_pushup_hmms$workout_idx)),
+        model_type = c("knn", "rf", "svm")
+      ) %.%
+      {
+        left_join(
+          chopped_pushup_hmms %>% select(workout_idx, classifier_data),
+          by = c("train_workout_idx" = "workout_idx")
+        )
+        mutate(
+          model_res = map2(model_type, classifier_data, get_fit_model),
+          fit_model = map(model_res, ~ .x$fit_model[[1]]),
+          training_metrics = map(model_res, ~.x %>% select(-fit_model))
+        )
+        select(-model_res, -classifier_data)
+        add_column(test_workout_idx = list(seq(1, max(chopped_pushup_hmms$workout_idx))))
+        unnest(test_workout_idx)
+        left_join(
+          chopped_pushup_hmms %>% select(workout_idx, classifier_data),
+          by = c("test_workout_idx" = "workout_idx")
+        )
+        group_by(train_workout_idx, model_type, test_workout_idx)
+        mutate(
+          testing_metrics = map2(fit_model, classifier_data, pushup_classification_metrics),
+          testing_roc = map2(fit_model, classifier_data, pushup_classification_roc)
+        )
+        unnest(testing_metrics)
+        unnest(testing_roc)
+      }
+    })
+
+    #> Updating stash.
+
+    optimal_models_cross_validation %.% {
+      select(
+        train_workout_idx, model_type, test_workout_idx,
+        sensitivity, specificity, precision, accuracy, roc_auc
       )
-      slice(1:3)
-      mutate(model_res = map2(model_type, classifier_data, get_fit_model))
-    }
-
-
-    optimal_models %.% {
+      pivot_longer(
+        -c(train_workout_idx, model_type, test_workout_idx),
+        names_to = "metric", 
+        values_to = "value"
+      )
+      filter(train_workout_idx != test_workout_idx)
+      group_by(train_workout_idx, model_type, metric)
+      summarise(
+        avg_value = mean(value),
+        sd_value = sd(value)
+      )
+      ungroup()
       mutate(
-        fit_model = map(model_res, ~ .x$fit_model[[1]]),
-        training_metrics = map(model_res, ~.x %>% select(-fit_model))
+        value_up = avg_value + sd_value,
+        value_dn = avg_value - sd_value,
+        train_workout_idx = glue("training\nwrkt #{train_workout_idx}")
       )
-      select(-model_res, -classifier_data)
-      add_column(test_workout_idx = list(seq(1, max(chopped_pushup_hmms$workout_idx))))
-      unnest(test_workout_idx)
-      left_join(
-        chopped_pushup_hmms %>% select(workout_idx, classifier_data),
-        by = c("test_workout_idx" = "workout_idx")
+    } %>% 
+      ggplot(aes(metric, avg_value)) +
+      facet_grid(train_workout_idx ~ model_type) +
+      geom_line(group = "a") +
+      geom_linerange(
+        aes(ymin = value_dn, ymax = value_up), 
+        alpha = 1
+      ) +
+      geom_point() +
+      scale_x_discrete(expand = c(0.07, 0.07)) +
+      scale_y_continuous(
+        expand = expansion(mult = c(0.02, 0.02)),
+      ) +
+      theme(
+        axis.text.x = element_text(angle = 35, hjust = 1)
+      ) +
+      labs(
+        x = NULL,
+        y = "average value"
       )
-      group_by(train_workout_idx, model_type, test_workout_idx)
-      mutate(
-        testing_metrics = map2(fit_model, classifier_data, pushup_classification_metrics),
-        testing_roc = map2(fit_model, classifier_data, pushup_classification_roc)
-      )
-      unnest(testing_metrics)
-      unnest(testing_roc)
-    }
 
-    #> # A tibble: 15 x 19
-    #> # Groups:   train_workout_idx, model_type, test_workout_idx [15]
-    #>    train_workout_i… model_type fit_model training_metrics test_workout_idx
-    #>               <int> <chr>      <list>    <list>                      <int>
-    #>  1                1 knn        <workflo… <tibble [1 × 26…                1
-    #>  2                1 knn        <workflo… <tibble [1 × 26…                2
-    #>  3                1 knn        <workflo… <tibble [1 × 26…                3
-    #>  4                1 knn        <workflo… <tibble [1 × 26…                4
-    #>  5                1 knn        <workflo… <tibble [1 × 26…                5
-    #>  6                1 rf         <workflo… <tibble [1 × 26…                1
-    #>  7                1 rf         <workflo… <tibble [1 × 26…                2
-    #>  8                1 rf         <workflo… <tibble [1 × 26…                3
-    #>  9                1 rf         <workflo… <tibble [1 × 26…                4
-    #> 10                1 rf         <workflo… <tibble [1 × 26…                5
-    #> 11                1 svm        <workflo… <tibble [1 × 26…                1
-    #> 12                1 svm        <workflo… <tibble [1 × 26…                2
-    #> 13                1 svm        <workflo… <tibble [1 × 26…                3
-    #> 14                1 svm        <workflo… <tibble [1 × 26…                4
-    #> 15                1 svm        <workflo… <tibble [1 × 26…                5
-    #> # … with 14 more variables: classifier_data <list>, pred_class <list>,
-    #> #   sensitivity <dbl>, specificity <dbl>, precision <dbl>, mcc <dbl>,
-    #> #   fmeasure <dbl>, accuracy <dbl>, kap <dbl>, ppv <dbl>, npv <dbl>,
-    #> #   pred_prob <list>, roc_curve <list>, roc_auc <dbl>
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+
+    optimal_models_cross_validation %.% {
+      filter(train_workout_idx != test_workout_idx)
+      select(train_workout_idx, model_type, test_workout_idx,
+             sensitivity, specificity, precision, accuracy, roc_auc, mcc)
+      pivot_longer(
+        -c(train_workout_idx, model_type, test_workout_idx),
+        names_to = "metric",
+        values_to = "value"
+      )
+    } %>%
+      ggplot(aes(x = model_type, y = value)) +
+      facet_wrap(~ metric, nrow = 2, scales = "free") +
+      geom_boxplot(aes(color = model_type), outlier.shape = NA) +
+      geom_jitter(aes(color = model_type), height = 0, width = 0.3, alpha = 0.3)
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+
+    optimal_models_cross_validation %.% {
+      select(
+        train_workout_idx, model_type, test_workout_idx,
+        roc_curve
+      )
+      unnest(roc_curve)
+      mutate(
+        line_group = paste(train_workout_idx, test_workout_idx),
+        train_is_test = train_workout_idx == test_workout_idx
+      )
+    } %>%
+      ggplot(aes(1-specificity, sensitivity)) +
+      facet_grid(.level ~ model_type) +
+      geom_line(
+        aes(
+          group = line_group, 
+          color = factor(test_workout_idx), 
+          lty = train_is_test
+        ), 
+        alpha = 0.5
+      ) +
+      scale_color_brewer(
+        type = "qual", 
+        palette = "Dark2", 
+        guide = FALSE
+      ) +
+      scale_linetype_manual(
+        values = c("TRUE" = 2, "FALSE" = 1), 
+        guide = FALSE
+      ) +
+      labs(
+        x = "1 - specificity",
+        y = "sensitivity",
+        title = "ROC of different model types",
+        subtitle = "The colors indicate different workout data sets and the dashed lines are when\nthe model was trained on that workout data set."
+      )
+
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+
+### 5. Applying the trained model to new data
+
+This step will require a more refined pipeline than I have developed in
+this notebook. I have skipped it here, but it will be in the next one.
+
+------------------------------------------------------------------------
+
+Conclusions
+-----------
+
+### Data processing
+
+I think smoothing and scaling the data is required for the HMM and
+likely helps the classifiers. I need to better account for how new data
+will be collected and classified in real time. For example, the training
+data’s mean and standard deviation will need to be stored for scaling
+the new data.
+
+### HMM
+
+I need to remember that the states that the HMM identifies need to be
+mapped to the states of a push-up. The chopping by the HMM and addition
+of “unknown” data worked quite well.
+
+### Classifier models
+
+I would recommend moving forward with the random forest. It outperformed
+the kNN and SVM classifiers on most metrics and is the most consistent
+across data sets and on new, unseen data.
