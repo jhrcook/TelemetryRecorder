@@ -24,16 +24,15 @@ Data
                                       x = value,
                                       y = smooth_value,
                                       rolling_n = 10) {
-      
-      before_after = round(rolling_n / 2)
-      
+      before_after <- round(rolling_n / 2)
+
       df %.% {
         group_by(axis, motion)
         mutate(
           {{ y }} := slider::slide_dbl(
-            {{ x }}, 
-            .f = ~ max(abs(.x)), 
-            .before = before_after, 
+            {{ x }},
+            .f = ~ max(abs(.x)),
+            .before = before_after,
             .after = before_after
           ),
           {{ y }} := slider::slide_dbl(
@@ -285,7 +284,7 @@ probability of either state 1 or 2 is less than 0.90. Additional
           TRUE ~ "unknown"
         ))
       }
-      
+
       if (workout_idx %in% DATASETS_TO_REVERSE_STATES) {
         message("Flipping state assignments.")
         training_data_1 <- training_data_1 %.% {
@@ -372,114 +371,9 @@ A t-SNE plot of the data made to train the classifiers.
 
 ### 4. Train a classifier with the HMM-prepared training data.
 
-    # Append a prefix to each column name of a data frame.
-    prefix_colnames <- function(d, prefix) {
-      colnames(d) <- paste0(prefix, colnames(d))
-      return(d)
-    }
-
-
-    # Collect classification ROC results.
-    pushup_classification_roc <- function(fit, data) {
-      pred_data <- predict(fit, data, type = "prob") %>%
-        bind_cols(data)
-      
-      roc_curve <- roc_curve(
-        pred_data,
-        truth = factor(state),
-        .pred_state1, .pred_state2, .pred_unknown
-      )
-      
-      roc_auc_est <- roc_auc(
-        pred_data,
-        truth = factor(state),
-        .pred_state1, .pred_state2, .pred_unknown
-      )
-      
-      tibble(
-        pred_prob = list(pred_data),
-        roc_curve = list(roc_curve),
-        roc_auc = roc_auc_est$.estimate[[1]]
-      )
-    }
-
-    # Collect classification metrics.
-    pushup_classification_metrics <- function(fit, data) {
-      metric_f <- function(pred_data, fxn) {
-        fxn(pred_data, state, .pred_class)$.estimate[[1]]
-      }
-
-      pred_data <- predict(fit, data, type = "class") %>%
-        bind_cols(data) %>%
-        mutate(state = factor(state))
-      
-      tibble(
-        pred_class = list(pred_data),
-        sensitivity = metric_f(pred_data, sensitivity),
-        specificity = metric_f(pred_data, specificity),
-        precision = metric_f(pred_data, precision),
-        mcc = metric_f(pred_data, mcc),
-        fmeasure = metric_f(pred_data, f_meas),
-        accuracy = metric_f(pred_data, accuracy),
-        kap = metric_f(pred_data, kap),
-        ppv = metric_f(pred_data, ppv),
-        npv = metric_f(pred_data, npv)
-      )
-    }
-
-
-    classifier_assessment_workflow <- function(fit, train_data, test_data) {
-      roc_results_train <- pushup_classification_roc(fit, train_data) %>% 
-        prefix_colnames("train_")
-      roc_results_test <- pushup_classification_roc(fit, test_data) %>% 
-        prefix_colnames("test_")
-      
-      class_results_train <- pushup_classification_metrics(fit, train_data) %>%
-        prefix_colnames("train_")
-      class_results_test <- pushup_classification_metrics(fit, test_data) %>%
-        prefix_colnames("test_")
-      
-      bind_cols(
-        roc_results_train, roc_results_test, 
-        class_results_train, class_results_test
-      )
-    }
-
-    run_classifier_workflow <- function(data, model_spec, prop = 0.75) {
-
-      # Model recipe.
-      model_recipe <- recipe(
-        state ~ x + y + z + pitch + roll + yaw,
-        data = data
-      )
-
-      # TidyModels workflow.
-      classifer_workflow <- workflow() %>%
-        add_model(model_spec) %>%
-        add_recipe(model_recipe)
-
-      # Split data into training and testing.
-      data_split <- initial_split(data, prop = prop, strata = "state")
-      train_data <- training(data_split)
-      test_data <- testing(data_split)
-
-      # Fit the model.
-      fit_model <- parsnip::fit(classifer_workflow, data = train_data)
-
-      # Get model assessment values.
-      model_assessment <- classifier_assessment_workflow(
-        fit_model,
-        train_data,
-        test_data
-      )
-      
-      bind_cols(
-        tibble(fit_model = list(fit_model)),
-        model_assessment
-      )
-    }
-
-Wrappers for four different classification model types.
+The main code that interfaces with ‘TidyModels’ is held in
+`src/tidymodel-helpers.R`. Below are wrappers for four different
+classification model types.
 
     # KNN classifier.
     run_knn_workflow <- function(data, neighbors = 5) {
@@ -654,7 +548,7 @@ Wrappers for four different classification model types.
 
     plot_classifier_tuning_results(coarse_tuning_knn, x = neighbors)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
 
     n_rep <- 20
     fine_knn_k <- seq(15, 31, 1)
@@ -675,7 +569,7 @@ Wrappers for four different classification model types.
 
     plot_classifier_tuning_results(fine_tuning_knn, neighbors)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 #### Random forest hyperparameter tuning
 
@@ -699,7 +593,7 @@ Wrappers for four different classification model types.
     plot_classifier_tuning_results(coarse_tuning_rf, x = trees, mtry) +
       facet_grid(mtry ~ test_train)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
     n_rep <- 10
     fine_rf_grid <- expand.grid(
@@ -720,7 +614,7 @@ Wrappers for four different classification model types.
 
     plot_classifier_tuning_results(fine_tuning_rf, x = trees, mtry)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 #### Naive Bayes hyperparameter tuning
 
@@ -744,7 +638,7 @@ Wrappers for four different classification model types.
 
     plot_classifier_tuning_results(coarse_tuning_nb, x = smoothness)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 #### SVM hyperparameter tuning
 
@@ -768,7 +662,7 @@ Wrappers for four different classification model types.
     plot_classifier_tuning_results(coarse_tuning_svm, x = cost, rbf_sigma) +
       facet_grid(rbf_sigma ~ test_train, scales = "free_y")
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
     n_rep <- 10
     fine_svm_grid <- expand_grid(
@@ -790,7 +684,7 @@ Wrappers for four different classification model types.
     plot_classifier_tuning_results(fine_tuning_svm, x = cost, rbf_sigma) +
       facet_grid(rbf_sigma ~ test_train)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 ### Table of best classifier hyperparameters
 
@@ -806,88 +700,87 @@ experimentation as it tends to be a bit tricky to train and tune.
 
 ### Deciding on a classification model
 
-(In progress.)
-
     get_fit_model <- function(model_type = c("knn", "rf", "svm"), data) {
       model_type <- str_to_lower(model_type[[1]])
-      model_data <- 
-      if (model_type == "knn") {
-        return(run_knn_workflow(eg_training_data, neighbors = 20))
-      } else if (model_type == "rf") {
-        return(run_rf_workflow(eg_training_data, mtry = 1, trees = 16))
-      } else if (model_type == "svm") {
-        return(run_svm_workflow(eg_training_data, cost = 20, rbf_sigma = 1))
-      } else {
-        stop(glue::glue("Unrecognized model type: {model_type}"))
-      }
+      model_data <-
+        if (model_type == "knn") {
+          return(run_knn_workflow(eg_training_data, neighbors = 20))
+        } else if (model_type == "rf") {
+          return(run_rf_workflow(eg_training_data, mtry = 1, trees = 16))
+        } else if (model_type == "svm") {
+          return(run_svm_workflow(eg_training_data, cost = 20, rbf_sigma = 1))
+        } else {
+          stop(glue::glue("Unrecognized model type: {model_type}"))
+        }
     }
 
 
     stash(
-      "optimal_models_cross_validation", 
-      depends_on = "chopped_pushup_hmms", 
-    {
-      optimal_models_cross_validation <- expand_grid(
-        train_workout_idx = seq(1, max(chopped_pushup_hmms$workout_idx)),
-        model_type = c("knn", "rf", "svm")
-      ) %.%
+      "optimal_models_cross_validation",
+      depends_on = "chopped_pushup_hmms",
       {
-        left_join(
-          chopped_pushup_hmms %>% select(workout_idx, classifier_data),
-          by = c("train_workout_idx" = "workout_idx")
-        )
-        mutate(
-          model_res = map2(model_type, classifier_data, get_fit_model),
-          fit_model = map(model_res, ~ .x$fit_model[[1]]),
-          training_metrics = map(model_res, ~.x %>% select(-fit_model))
-        )
-        select(-model_res, -classifier_data)
-        add_column(test_workout_idx = list(seq(1, max(chopped_pushup_hmms$workout_idx))))
-        unnest(test_workout_idx)
-        left_join(
-          chopped_pushup_hmms %>% select(workout_idx, classifier_data),
-          by = c("test_workout_idx" = "workout_idx")
-        )
-        group_by(train_workout_idx, model_type, test_workout_idx)
-        mutate(
-          testing_metrics = map2(fit_model, classifier_data, pushup_classification_metrics),
-          testing_roc = map2(fit_model, classifier_data, pushup_classification_roc)
-        )
-        unnest(testing_metrics)
-        unnest(testing_roc)
+        optimal_models_cross_validation <- expand_grid(
+          train_workout_idx = seq(1, max(chopped_pushup_hmms$workout_idx)),
+          model_type = c("knn", "rf", "svm")
+        ) %.% {
+          left_join(
+            chopped_pushup_hmms %>% select(workout_idx, classifier_data),
+            by = c("train_workout_idx" = "workout_idx")
+          )
+          mutate(
+            model_res = map2(model_type, classifier_data, get_fit_model),
+            fit_model = map(model_res, ~ .x$fit_model[[1]]),
+            training_metrics = map(model_res, ~ .x %>% select(-fit_model))
+          )
+          select(-model_res, -classifier_data)
+          add_column(test_workout_idx = list(seq(1, max(chopped_pushup_hmms$workout_idx))))
+          unnest(test_workout_idx)
+          left_join(
+            chopped_pushup_hmms %>% select(workout_idx, classifier_data),
+            by = c("test_workout_idx" = "workout_idx")
+          )
+          group_by(train_workout_idx, model_type, test_workout_idx)
+          mutate(
+            testing_metrics = map2(fit_model, classifier_data, pushup_classification_metrics),
+            testing_roc = map2(fit_model, classifier_data, pushup_classification_roc)
+          )
+          unnest(testing_metrics)
+          unnest(testing_roc)
+        }
       }
-    })
+    )
 
     #> Updating stash.
 
-    optimal_models_cross_validation %.% {
-      select(
-        train_workout_idx, model_type, test_workout_idx,
-        sensitivity, specificity, precision, accuracy, roc_auc
-      )
-      pivot_longer(
-        -c(train_workout_idx, model_type, test_workout_idx),
-        names_to = "metric", 
-        values_to = "value"
-      )
-      filter(train_workout_idx != test_workout_idx)
-      group_by(train_workout_idx, model_type, metric)
-      summarise(
-        avg_value = mean(value),
-        sd_value = sd(value)
-      )
-      ungroup()
-      mutate(
-        value_up = avg_value + sd_value,
-        value_dn = avg_value - sd_value,
-        train_workout_idx = glue("training\nwrkt #{train_workout_idx}")
-      )
-    } %>% 
+    optimal_models_cross_validation %.%
+      {
+        select(
+          train_workout_idx, model_type, test_workout_idx,
+          sensitivity, specificity, precision, accuracy, roc_auc
+        )
+        pivot_longer(
+          -c(train_workout_idx, model_type, test_workout_idx),
+          names_to = "metric",
+          values_to = "value"
+        )
+        filter(train_workout_idx != test_workout_idx)
+        group_by(train_workout_idx, model_type, metric)
+        summarise(
+          avg_value = mean(value),
+          sd_value = sd(value)
+        )
+        ungroup()
+        mutate(
+          value_up = avg_value + sd_value,
+          value_dn = avg_value - sd_value,
+          train_workout_idx = glue("training\nwrkt #{train_workout_idx}")
+        )
+      } %>%
       ggplot(aes(metric, avg_value)) +
       facet_grid(train_workout_idx ~ model_type) +
       geom_line(group = "a") +
       geom_linerange(
-        aes(ymin = value_dn, ymax = value_up), 
+        aes(ymin = value_dn, ymax = value_up),
         alpha = 1
       ) +
       geom_point() +
@@ -903,53 +796,57 @@ experimentation as it tends to be a bit tricky to train and tune.
         y = "average value"
       )
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
-    optimal_models_cross_validation %.% {
-      filter(train_workout_idx != test_workout_idx)
-      select(train_workout_idx, model_type, test_workout_idx,
-             sensitivity, specificity, precision, accuracy, roc_auc, mcc)
-      pivot_longer(
-        -c(train_workout_idx, model_type, test_workout_idx),
-        names_to = "metric",
-        values_to = "value"
-      )
-    } %>%
+    optimal_models_cross_validation %.%
+      {
+        filter(train_workout_idx != test_workout_idx)
+        select(
+          train_workout_idx, model_type, test_workout_idx,
+          sensitivity, specificity, precision, accuracy, roc_auc, mcc
+        )
+        pivot_longer(
+          -c(train_workout_idx, model_type, test_workout_idx),
+          names_to = "metric",
+          values_to = "value"
+        )
+      } %>%
       ggplot(aes(x = model_type, y = value)) +
-      facet_wrap(~ metric, nrow = 2, scales = "free") +
+      facet_wrap(~metric, nrow = 2, scales = "free") +
       geom_boxplot(aes(color = model_type), outlier.shape = NA) +
       geom_jitter(aes(color = model_type), height = 0, width = 0.3, alpha = 0.3)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
-    optimal_models_cross_validation %.% {
-      select(
-        train_workout_idx, model_type, test_workout_idx,
-        roc_curve
-      )
-      unnest(roc_curve)
-      mutate(
-        line_group = paste(train_workout_idx, test_workout_idx),
-        train_is_test = train_workout_idx == test_workout_idx
-      )
-    } %>%
-      ggplot(aes(1-specificity, sensitivity)) +
+    optimal_models_cross_validation %.%
+      {
+        select(
+          train_workout_idx, model_type, test_workout_idx,
+          roc_curve
+        )
+        unnest(roc_curve)
+        mutate(
+          line_group = paste(train_workout_idx, test_workout_idx),
+          train_is_test = train_workout_idx == test_workout_idx
+        )
+      } %>%
+      ggplot(aes(1 - specificity, sensitivity)) +
       facet_grid(.level ~ model_type) +
       geom_line(
         aes(
-          group = line_group, 
-          color = factor(test_workout_idx), 
+          group = line_group,
+          color = factor(test_workout_idx),
           lty = train_is_test
-        ), 
+        ),
         alpha = 0.5
       ) +
       scale_color_brewer(
-        type = "qual", 
-        palette = "Dark2", 
+        type = "qual",
+        palette = "Dark2",
         guide = FALSE
       ) +
       scale_linetype_manual(
-        values = c("TRUE" = 2, "FALSE" = 1), 
+        values = c("TRUE" = 2, "FALSE" = 1),
         guide = FALSE
       ) +
       labs(
@@ -959,7 +856,7 @@ experimentation as it tends to be a bit tricky to train and tune.
         subtitle = "The colors indicate different workout data sets and the dashed lines are when\nthe model was trained on that workout data set."
       )
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
 ### 5. Applying the trained model to new data
 
