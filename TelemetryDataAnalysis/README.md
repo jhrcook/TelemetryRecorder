@@ -8,4 +8,17 @@
 
 See the [original notebook](analysis/05_011_classifier-training-implementation-pipeline.md) for details.
 
-(in progress)
+Below is a flowchart of the pipeline used for this modeling process.
+
+<img src="analysis/05_011_classifier-training-implementation-pipeline_files/pipeline-diagram.png" width="300px">
+
+A random forest fit on one set of data was able to reliably identify the states of the exercise from completely new push-up data.
+
+![](analysis/05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-17-1.png)
+
+---
+
+### To-Do
+
+1. Start a new notebook to focus on tuning all of the random forest hyperparameters available through 'ranger'.
+2. Modify "05_011_classifier-training-implementation-pipeline.Rmd" to use the scaled and smoothed data for the HMM, but only the smoothed data for the RF.
