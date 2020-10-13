@@ -105,7 +105,7 @@ Pipeline
         apply_smoothing_trans(x = scaled_value)
     }
 
-    train_dataset <- transform_pushup_data(train_dataset) %>%
+    hmm_train_dataset <- transform_pushup_data(train_dataset) %>%
       select(-scaled_value)
 
 ### 2. Fit HMM
@@ -146,7 +146,7 @@ Pipeline
       )
     }
 
-    hmm_fit_data <- prepare_hmm_fitting_data(train_dataset)
+    hmm_fit_data <- prepare_hmm_fitting_data(hmm_train_dataset)
     pushup_hmm <- construct_pushup_hmm(hmm_fit_data)
     pushup_hmm <- fit(pushup_hmm)
 
@@ -154,9 +154,13 @@ Pipeline
 
 ### 3. Chop data into states
 
-    prepare_rf_training_data <- function(hmm, data, prob_cutoff = 0.9, outer_unknown_q = 0.1) {
+    prepare_rf_training_data <- function(hmm, 
+                                         hmm_data, 
+                                         full_data, 
+                                         prob_cutoff = 0.9,
+                                         outer_unknown_q = 0.1) {
       hmm_posterior <- bind_cols(
-        data,
+        hmm_data,
         posterior(hmm)
       ) %.% {
         slice(-1) # Drop the first data point (often unreliable).
@@ -168,24 +172,34 @@ Pipeline
       }
 
 
-      unknown_data <- data %.% {
+      unknown_data <- full_data %.% {
         filter(
           date < quantile(date, outer_unknown_q) |
-            data > quantile(date, 1 - outer_unknown_q)
+            date > quantile(date, 1 - outer_unknown_q)
         )
         add_column(state = "unknown")
       }
 
       d <- bind_rows(hmm_posterior, unknown_data)
       d <- d[sample(nrow(d)), ] # shuffle rows
+      return(d)
     }
 
-    rf_training_data <- prepare_rf_training_data(pushup_hmm, hmm_fit_data)
+    train_dataset <- apply_smoothing_trans(train_dataset, x = value)
+
+    rf_training_data <- prepare_rf_training_data(
+      hmm = pushup_hmm, 
+      hmm_data = train_dataset %>% 
+        filter(date %in% hmm_fit_data$date) %>% 
+        pivot_telemetry_data(x = smooth_value),
+      full_data = pivot_telemetry_data(train_dataset),
+    )
+
     table(rf_training_data$state)
 
     #> 
     #>  state1  state2 unknown 
-    #>     311     346     147
+    #>     311     346     349
 
 ### 4. Train Random Forest Classifier
 
@@ -203,6 +217,235 @@ Pipeline
     pushup_rf_res <- run_rf_workflow(rf_training_data, mtry = 1, trees = 16)
     pushup_rf <- pushup_rf_res$fit_model[[1]]
 
+    pushup_rf_res %.% {
+      select(
+        -fit_model, -train_pred_prob, -train_roc_curve, 
+        -test_pred_prob, -test_roc_curve, -train_pred_class,
+        -test_pred_class
+      )
+      pivot_longer(-c())
+      mutate(
+        train_test = ifelse(str_detect(name, "train"), "train", "test"),
+        name = str_remove(name, "train_|test_"),
+        name = str_replace(name, "_", "-")
+      )
+      pivot_wider(train_test, names_from = name, values_from = value)
+      rename(
+        `train/test` = train_test
+      )
+    } %>%
+      knitr::kable()
+
+<table>
+<thead>
+<tr>
+<th style="text-align:left;">
+train/test
+</th>
+<th style="text-align:right;">
+roc-auc
+</th>
+<th style="text-align:right;">
+sensitivity
+</th>
+<th style="text-align:right;">
+specificity
+</th>
+<th style="text-align:right;">
+precision
+</th>
+<th style="text-align:right;">
+mcc
+</th>
+<th style="text-align:right;">
+fmeasure
+</th>
+<th style="text-align:right;">
+accuracy
+</th>
+<th style="text-align:right;">
+kap
+</th>
+<th style="text-align:right;">
+ppv
+</th>
+<th style="text-align:right;">
+npv
+</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left;">
+train
+</td>
+<td style="text-align:right;">
+0.9999402
+</td>
+<td style="text-align:right;">
+0.9871251
+</td>
+<td style="text-align:right;">
+0.9934469
+</td>
+<td style="text-align:right;">
+0.9867079
+</td>
+<td style="text-align:right;">
+0.9802968
+</td>
+<td style="text-align:right;">
+0.9867629
+</td>
+<td style="text-align:right;">
+0.9867725
+</td>
+<td style="text-align:right;">
+0.9801397
+</td>
+<td style="text-align:right;">
+0.9867079
+</td>
+<td style="text-align:right;">
+0.9933923
+</td>
+</tr>
+<tr>
+<td style="text-align:left;">
+test
+</td>
+<td style="text-align:right;">
+0.9974383
+</td>
+<td style="text-align:right;">
+0.9807538
+</td>
+<td style="text-align:right;">
+0.9902604
+</td>
+<td style="text-align:right;">
+0.9796175
+</td>
+<td style="text-align:right;">
+0.9702875
+</td>
+<td style="text-align:right;">
+0.9798653
+</td>
+<td style="text-align:right;">
+0.9800000
+</td>
+<td style="text-align:right;">
+0.9699844
+</td>
+<td style="text-align:right;">
+0.9796175
+</td>
+<td style="text-align:right;">
+0.9899355
+</td>
+</tr>
+</tbody>
+</table>
+
 #### 5. Scale and smooth new data to be classified
 
-(Needs to be processed as if it was new data streaming in.)
+> *NOTE*: The model fits best when the data has been scaled to its own
+> mean and standard deviation, not that of the original training data.
+> Therefore, I should probably not rely on scaling the data, just
+> smoothing it. Since the RF is a non-parametric model, this should not
+> effect its performance, but the scaled data will be needed for the
+> HMM.
+
+    # new_dataset <- transform_new_pushup_data(
+    #   df = new_dataset, 
+    #   training_dataset = train_dataset
+    # )
+    new_dataset <- apply_smoothing_trans(new_dataset, x = value)
+
+    plot_telmetry_data(df = new_dataset, x = smooth_value)
+
+![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+
+    make_rf_prediction <- function(rf_mdl, df, type = "prob") {
+      wide_df <- pivot_telemetry_data(df, x = smooth_value)
+      
+      pred_prob <- predict(
+        rf_mdl, 
+        wide_df,
+        type = "prob"
+      )
+      
+      classes <- str_remove(colnames(pred_prob), "\\.pred_")
+      pred_class <- classes[apply(pred_prob, 1, function(x) { which.max(x) })]
+      
+      
+      bind_cols(wide_df, pred_prob) %>%
+        mutate(.pred_class = pred_class)
+    }
+
+    rf_new_pred <- make_rf_prediction(pushup_rf, new_dataset)
+
+    most_common <- function(x) {
+      names(sort(table(x), decreasing = TRUE))[[1]]
+    }
+
+    rf_new_pred <- rf_new_pred %>%
+      mutate(sliding_pred = slider::slide_chr(
+        .pred_class,
+        most_common,
+        .before = 5,
+        .after = 5
+      ))
+
+    telemetry_plot <- plot_telmetry_data(new_dataset, x = smooth_value) +
+      labs(x = NULL)
+
+    pushup_state_pal <- c(
+      "state1" = "tomato",
+      "state2" = "dodgerblue",
+      "unknown" = "grey50"
+    )
+
+    pred_plot <- rf_new_pred %.% {
+      select(idx, .pred_state1, .pred_state2, .pred_unknown)
+      pivot_longer(-idx, names_to = "state", values_to = "prob")
+      mutate(state = str_remove(state, "\\.pred_"))
+      group_by(state) 
+      mutate(
+        smooth_prob = slider::slide_dbl(
+          prob,
+          mean,
+          .before = 20,
+          .after = 20
+        )
+      )
+    } %>%
+      ggplot(aes(idx, color = state)) +
+      geom_line(aes(y = prob), alpha = 1, size = 0.3) +
+      geom_line(aes(y = smooth_prob), alpha = 0.9, size = 1) +
+      scale_color_manual(values = pushup_state_pal) +
+      labs(
+        y = "probability",
+        color = NULL,
+        x = NULL,
+        title = "Random Forest probabilities"
+      )
+
+    pred_bar_plot <- rf_new_pred %>%
+      ggplot(aes(idx, y = 1, color = sliding_pred)) +
+      geom_line(aes(group = "a"), size = 10, alpha = 1) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0))) +
+      scale_color_manual(values = pushup_state_pal) +
+      theme(
+        axis.text.y = element_blank(),
+        legend.position = "none",
+        panel.grid.major.y = element_blank()
+      ) +
+      labs(y = NULL)
+
+
+    (telemetry_plot / pred_plot / pred_bar_plot) + 
+      plot_layout(heights = c(4, 4, 1))
+
+![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
