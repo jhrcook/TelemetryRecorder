@@ -1,3 +1,11 @@
+
+#### ---- Data set manipulations ---- ####
+
+
+
+
+#### ---- TidyModel interface ---- ####
+
 # Append a prefix to each column name of a data frame.
 prefix_colnames <- function(d, prefix) {
   colnames(d) <- paste0(prefix, colnames(d))
