@@ -42,21 +42,23 @@ g <- grViz("
 digraph a_nice_graph {
 
 # node definitions with substituted label text
-node [fontname = Helvetica]
-a [label = 'training data', shape = 'rectangle', color = 'steelblue']
-b [label = 'smooth & scale']
-c [label = 'fit HMM']
-d [label = 'chop data into states']
-e [label = 'train RF']
-f [label = 'new data', shape = 'rectangle', color = 'mediumvioletred']
+node [fontname = Helvetica, shape = 'oval']
+a [label = 'example data', color = 'steelblue', penwidth = 2]
+b [label = 'prepared example data']
+c [label = 'Hidden Markov Model', shape = 'rectangle', penwidth = 2]
+d [label = 'labeled example data']
+e [label = 'Random Forest', shape = 'rectangle', penwidth = 2]
+f [label = 'new data', color = 'mediumvioletred', penwidth = 2]
+g [label = 'prepared new data']
 
 # edge definitions with the node IDs
-a->b [color = 'steelblue']
-b->c [color = 'steelblue']
-b->e [color = 'mediumvioletred']
-c->d [color = 'steelblue']
-d->e [color = 'steelblue']
-f->b [color = 'mediumvioletred']
+edge [fontname = Helvetica, fontcolor = 'grey50', penwidth = 1.5]
+a->b [color = 'steelblue', label = ' scale & smooth']
+b->c [color = 'steelblue', label = ' fit']
+c->d [color = 'steelblue', label = ' predict']
+d->e [color = 'steelblue', label = ' train']
+f->g [color = 'mediumvioletred', label = ' smooth']
+g->e [color = 'mediumvioletred', label = ' predict']
 }
 ")
 
@@ -71,10 +73,10 @@ fn <- here(
 
 export_svg(g) %>%
   charToRaw() %>%
-  rsvg_png(file = fn, width = 800, height = 1200)
+  rsvg_png(file = fn, width = 1200, height = 1200)
 ```
 
-<img src="05_011_classifier-training-implementation-pipeline_files/pipeline-diagram.png" width="300px">
+<img src="05_011_classifier-training-implementation-pipeline_files/pipeline-diagram.png" width="600px">
 
 
 ### API
@@ -100,6 +102,7 @@ pushup_data <- tibble(filename = get_data_file_names(data_dir)) %.% {
 train_dataset <- pushup_data$data[[1]]
 new_dataset <- pushup_data$data[[6]]
 ```
+
 
 ## Pipeline
 
@@ -149,15 +152,26 @@ apply_smoothing_trans <- function(df,
 
 transform_pushup_data <- function(df) {
   df %>%
-    apply_scale_trans() %>%
-    apply_smoothing_trans(x = scaled_value)
+    apply_scale_trans(
+      x = value,
+      y = scaled_value
+    ) %>%
+    apply_smoothing_trans(
+      x = value,
+      y = smooth_value
+    ) %>%
+    apply_smoothing_trans(
+      x = scaled_value,
+      y = scaled_smooth_value
+    )
 }
 ```
 
 ```{r}
-hmm_train_dataset <- transform_pushup_data(train_dataset) %>%
-  select(-scaled_value)
+train_dataset <- transform_pushup_data(train_dataset)
+train_dataset
 ```
+
 
 ### 2. Fit HMM
 
@@ -175,7 +189,7 @@ pivot_telemetry_data <- function(telemetry_data, x = value) {
 prepare_hmm_fitting_data <- function(df, lower_q = 0.3, upper_q = 0.7) {
   df %>%
     filter(date > quantile(date, lower_q) & date < quantile(date, upper_q)) %>%
-    pivot_telemetry_data(x = smooth_value)
+    pivot_telemetry_data(x = scaled_smooth_value)
 }
 
 
@@ -201,17 +215,23 @@ construct_pushup_hmm <- function(d, nstates = 2) {
 
 
 ```{r}
-hmm_fit_data <- prepare_hmm_fitting_data(hmm_train_dataset)
+hmm_fit_data <- prepare_hmm_fitting_data(train_dataset)
 pushup_hmm <- construct_pushup_hmm(hmm_fit_data)
 pushup_hmm <- fit(pushup_hmm)
 ```
+```{r}
+train_dataset %>%
+  filter(date %in% hmm_fit_data$date) %>%
+  plot_hmm_fit(pushup_hmm, data_x = scaled_smooth_value)
+```
+
 
 ### 3. Chop data into states
 
 ```{r}
-prepare_rf_training_data <- function(hmm, 
-                                     hmm_data, 
-                                     full_data, 
+prepare_rf_training_data <- function(hmm,
+                                     hmm_data,
+                                     full_data,
                                      prob_cutoff = 0.9,
                                      outer_unknown_q = 0.1) {
   hmm_posterior <- bind_cols(
@@ -242,18 +262,17 @@ prepare_rf_training_data <- function(hmm,
 ```
 
 ```{r}
-train_dataset <- apply_smoothing_trans(train_dataset, x = value)
-
 rf_training_data <- prepare_rf_training_data(
-  hmm = pushup_hmm, 
-  hmm_data = train_dataset %>% 
-    filter(date %in% hmm_fit_data$date) %>% 
+  hmm = pushup_hmm,
+  hmm_data = train_dataset %>%
+    filter(date %in% hmm_fit_data$date) %>%
     pivot_telemetry_data(x = smooth_value),
   full_data = pivot_telemetry_data(train_dataset),
 )
 
 table(rf_training_data$state)
 ```
+
 
 ### 4. Train Random Forest Classifier
 
@@ -276,59 +295,54 @@ pushup_rf <- pushup_rf_res$fit_model[[1]]
 ```
 
 ```{r}
-pushup_rf_res %.% {
-  select(
-    -fit_model, -train_pred_prob, -train_roc_curve, 
-    -test_pred_prob, -test_roc_curve, -train_pred_class,
-    -test_pred_class
-  )
-  pivot_longer(-c())
-  mutate(
-    train_test = ifelse(str_detect(name, "train"), "train", "test"),
-    name = str_remove(name, "train_|test_"),
-    name = str_replace(name, "_", "-")
-  )
-  pivot_wider(train_test, names_from = name, values_from = value)
-  rename(
-    `train/test` = train_test
-  )
-} %>%
+pushup_rf_res %.%
+  {
+    select(
+      -fit_model, -train_pred_prob, -train_roc_curve,
+      -test_pred_prob, -test_roc_curve, -train_pred_class,
+      -test_pred_class
+    )
+    pivot_longer(-c())
+    mutate(
+      train_test = ifelse(str_detect(name, "train"), "train", "test"),
+      name = str_remove(name, "train_|test_"),
+      name = str_replace(name, "_", "-")
+    )
+    pivot_wider(train_test, names_from = name, values_from = value)
+    rename(
+      `train/test` = train_test
+    )
+  } %>%
   knitr::kable()
 ```
 
 
-#### 5. Scale and smooth new data to be classified
-
-> *NOTE*: The model fits best when the data has been scaled to its own mean and standard deviation, not that of the original training data.
-> Therefore, I should probably not rely on scaling the data, just smoothing it.
-> Since the RF is a non-parametric model, this should not effect its performance, but the scaled data will be needed for the HMM.
+### 5. Smooth new data to be classified
 
 ```{r}
-# new_dataset <- transform_new_pushup_data(
-#   df = new_dataset, 
-#   training_dataset = train_dataset
-# )
 new_dataset <- apply_smoothing_trans(new_dataset, x = value)
-```
-
-```{r}
 plot_telmetry_data(df = new_dataset, x = smooth_value)
 ```
+
+
+### 6. Make predictions on new data
 
 ```{r}
 make_rf_prediction <- function(rf_mdl, df, type = "prob") {
   wide_df <- pivot_telemetry_data(df, x = smooth_value)
-  
+
   pred_prob <- predict(
-    rf_mdl, 
+    rf_mdl,
     wide_df,
     type = "prob"
   )
-  
+
   classes <- str_remove(colnames(pred_prob), "\\.pred_")
-  pred_class <- classes[apply(pred_prob, 1, function(x) { which.max(x) })]
-  
-  
+  pred_class <- classes[apply(pred_prob, 1, function(x) {
+    which.max(x)
+  })]
+
+
   bind_cols(wide_df, pred_prob) %>%
     mutate(.pred_class = pred_class)
 }
@@ -362,20 +376,21 @@ pushup_state_pal <- c(
   "unknown" = "grey50"
 )
 
-pred_plot <- rf_new_pred %.% {
-  select(idx, .pred_state1, .pred_state2, .pred_unknown)
-  pivot_longer(-idx, names_to = "state", values_to = "prob")
-  mutate(state = str_remove(state, "\\.pred_"))
-  group_by(state) 
-  mutate(
-    smooth_prob = slider::slide_dbl(
-      prob,
-      mean,
-      .before = 20,
-      .after = 20
+pred_plot <- rf_new_pred %.%
+  {
+    select(idx, .pred_state1, .pred_state2, .pred_unknown)
+    pivot_longer(-idx, names_to = "state", values_to = "prob")
+    mutate(state = str_remove(state, "\\.pred_"))
+    group_by(state)
+    mutate(
+      smooth_prob = slider::slide_dbl(
+        prob,
+        mean,
+        .before = 20,
+        .after = 20
+      )
     )
-  )
-} %>%
+  } %>%
   ggplot(aes(idx, color = state)) +
   geom_line(aes(y = prob), alpha = 1, size = 0.3) +
   geom_line(aes(y = smooth_prob), alpha = 0.9, size = 1) +
@@ -400,11 +415,6 @@ pred_bar_plot <- rf_new_pred %>%
   labs(y = NULL)
 
 
-(telemetry_plot / pred_plot / pred_bar_plot) + 
+(telemetry_plot / pred_plot / pred_bar_plot) +
   plot_layout(heights = c(4, 4, 1))
 ```
-
-```{r}
-
-```
-

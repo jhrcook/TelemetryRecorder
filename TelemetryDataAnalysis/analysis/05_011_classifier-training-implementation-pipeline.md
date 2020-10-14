@@ -26,7 +26,7 @@ real use-case
 4.  Train a classifier on this training data.
 5.  Apply the classifier to new data as it is being collected.
 
-<img src="05_011_classifier-training-implementation-pipeline_files/pipeline-diagram.png" width="300px">
+<img src="05_011_classifier-training-implementation-pipeline_files/pipeline-diagram.png" width="600px">
 
 ### API
 
@@ -101,12 +101,37 @@ Pipeline
 
     transform_pushup_data <- function(df) {
       df %>%
-        apply_scale_trans() %>%
-        apply_smoothing_trans(x = scaled_value)
+        apply_scale_trans(
+          x = value,
+          y = scaled_value
+        ) %>%
+        apply_smoothing_trans(
+          x = value,
+          y = smooth_value
+        ) %>%
+        apply_smoothing_trans(
+          x = scaled_value,
+          y = scaled_smooth_value
+        )
     }
 
-    hmm_train_dataset <- transform_pushup_data(train_dataset) %>%
-      select(-scaled_value)
+    train_dataset <- transform_pushup_data(train_dataset)
+    train_dataset
+
+    #> # A tibble: 10,086 x 8
+    #>      date   idx axis     value motion scaled_value smooth_value scaled_smooth_v…
+    #>     <dbl> <int> <chr>    <dbl> <chr>         <dbl>        <dbl>            <dbl>
+    #>  1 0          1 x      3.10e-2 accel…       0.0856      0.0310            0.0941
+    #>  2 0          1 y      1.57e-2 accel…       0.152       0.0176            0.191 
+    #>  3 0          1 z      4.35e-2 accel…       0.164       0.0463            0.181 
+    #>  4 0          1 pitch -5.28e-2 attit…      -1.04        0.0528            1.04  
+    #>  5 0          1 yaw   -5.55e-5 attit…       1.98        0.00743           1.98  
+    #>  6 0          1 roll  -2.10e-3 attit…      -2.63        0.0164            2.63  
+    #>  7 0.0219     2 x      2.91e-2 accel…       0.0683      0.0315            0.0973
+    #>  8 0.0219     2 y      1.70e-2 accel…       0.167       0.0206            0.233 
+    #>  9 0.0219     2 z      4.63e-2 accel…       0.181       0.0463            0.194 
+    #> 10 0.0219     2 pitch -5.13e-2 attit…      -1.03        0.0528            1.04  
+    #> # … with 10,076 more rows
 
 ### 2. Fit HMM
 
@@ -123,7 +148,7 @@ Pipeline
     prepare_hmm_fitting_data <- function(df, lower_q = 0.3, upper_q = 0.7) {
       df %>%
         filter(date > quantile(date, lower_q) & date < quantile(date, upper_q)) %>%
-        pivot_telemetry_data(x = smooth_value)
+        pivot_telemetry_data(x = scaled_smooth_value)
     }
 
 
@@ -146,17 +171,25 @@ Pipeline
       )
     }
 
-    hmm_fit_data <- prepare_hmm_fitting_data(hmm_train_dataset)
+    hmm_fit_data <- prepare_hmm_fitting_data(train_dataset)
     pushup_hmm <- construct_pushup_hmm(hmm_fit_data)
     pushup_hmm <- fit(pushup_hmm)
 
     #> converged at iteration 47 with logLik: 935.1952
 
+    train_dataset %>%
+      filter(date %in% hmm_fit_data$date) %>%
+      plot_hmm_fit(pushup_hmm, data_x = scaled_smooth_value)
+
+![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
+    #> NULL
+
 ### 3. Chop data into states
 
-    prepare_rf_training_data <- function(hmm, 
-                                         hmm_data, 
-                                         full_data, 
+    prepare_rf_training_data <- function(hmm,
+                                         hmm_data,
+                                         full_data,
                                          prob_cutoff = 0.9,
                                          outer_unknown_q = 0.1) {
       hmm_posterior <- bind_cols(
@@ -185,12 +218,10 @@ Pipeline
       return(d)
     }
 
-    train_dataset <- apply_smoothing_trans(train_dataset, x = value)
-
     rf_training_data <- prepare_rf_training_data(
-      hmm = pushup_hmm, 
-      hmm_data = train_dataset %>% 
-        filter(date %in% hmm_fit_data$date) %>% 
+      hmm = pushup_hmm,
+      hmm_data = train_dataset %>%
+        filter(date %in% hmm_fit_data$date) %>%
         pivot_telemetry_data(x = smooth_value),
       full_data = pivot_telemetry_data(train_dataset),
     )
@@ -217,23 +248,24 @@ Pipeline
     pushup_rf_res <- run_rf_workflow(rf_training_data, mtry = 1, trees = 16)
     pushup_rf <- pushup_rf_res$fit_model[[1]]
 
-    pushup_rf_res %.% {
-      select(
-        -fit_model, -train_pred_prob, -train_roc_curve, 
-        -test_pred_prob, -test_roc_curve, -train_pred_class,
-        -test_pred_class
-      )
-      pivot_longer(-c())
-      mutate(
-        train_test = ifelse(str_detect(name, "train"), "train", "test"),
-        name = str_remove(name, "train_|test_"),
-        name = str_replace(name, "_", "-")
-      )
-      pivot_wider(train_test, names_from = name, values_from = value)
-      rename(
-        `train/test` = train_test
-      )
-    } %>%
+    pushup_rf_res %.%
+      {
+        select(
+          -fit_model, -train_pred_prob, -train_roc_curve,
+          -test_pred_prob, -test_roc_curve, -train_pred_class,
+          -test_pred_class
+        )
+        pivot_longer(-c())
+        mutate(
+          train_test = ifelse(str_detect(name, "train"), "train", "test"),
+          name = str_remove(name, "train_|test_"),
+          name = str_replace(name, "_", "-")
+        )
+        pivot_wider(train_test, names_from = name, values_from = value)
+        rename(
+          `train/test` = train_test
+        )
+      } %>%
       knitr::kable()
 
 <table>
@@ -348,38 +380,30 @@ test
 </tbody>
 </table>
 
-#### 5. Scale and smooth new data to be classified
+### 5. Smooth new data to be classified
 
-> *NOTE*: The model fits best when the data has been scaled to its own
-> mean and standard deviation, not that of the original training data.
-> Therefore, I should probably not rely on scaling the data, just
-> smoothing it. Since the RF is a non-parametric model, this should not
-> effect its performance, but the scaled data will be needed for the
-> HMM.
-
-    # new_dataset <- transform_new_pushup_data(
-    #   df = new_dataset, 
-    #   training_dataset = train_dataset
-    # )
     new_dataset <- apply_smoothing_trans(new_dataset, x = value)
-
     plot_telmetry_data(df = new_dataset, x = smooth_value)
 
 ![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
+### 6. Make predictions on new data
+
     make_rf_prediction <- function(rf_mdl, df, type = "prob") {
       wide_df <- pivot_telemetry_data(df, x = smooth_value)
-      
+
       pred_prob <- predict(
-        rf_mdl, 
+        rf_mdl,
         wide_df,
         type = "prob"
       )
-      
+
       classes <- str_remove(colnames(pred_prob), "\\.pred_")
-      pred_class <- classes[apply(pred_prob, 1, function(x) { which.max(x) })]
-      
-      
+      pred_class <- classes[apply(pred_prob, 1, function(x) {
+        which.max(x)
+      })]
+
+
       bind_cols(wide_df, pred_prob) %>%
         mutate(.pred_class = pred_class)
     }
@@ -407,20 +431,21 @@ test
       "unknown" = "grey50"
     )
 
-    pred_plot <- rf_new_pred %.% {
-      select(idx, .pred_state1, .pred_state2, .pred_unknown)
-      pivot_longer(-idx, names_to = "state", values_to = "prob")
-      mutate(state = str_remove(state, "\\.pred_"))
-      group_by(state) 
-      mutate(
-        smooth_prob = slider::slide_dbl(
-          prob,
-          mean,
-          .before = 20,
-          .after = 20
+    pred_plot <- rf_new_pred %.%
+      {
+        select(idx, .pred_state1, .pred_state2, .pred_unknown)
+        pivot_longer(-idx, names_to = "state", values_to = "prob")
+        mutate(state = str_remove(state, "\\.pred_"))
+        group_by(state)
+        mutate(
+          smooth_prob = slider::slide_dbl(
+            prob,
+            mean,
+            .before = 20,
+            .after = 20
+          )
         )
-      )
-    } %>%
+      } %>%
       ggplot(aes(idx, color = state)) +
       geom_line(aes(y = prob), alpha = 1, size = 0.3) +
       geom_line(aes(y = smooth_prob), alpha = 0.9, size = 1) +
@@ -445,7 +470,7 @@ test
       labs(y = NULL)
 
 
-    (telemetry_plot / pred_plot / pred_bar_plot) + 
+    (telemetry_plot / pred_plot / pred_bar_plot) +
       plot_layout(heights = c(4, 4, 1))
 
 ![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
