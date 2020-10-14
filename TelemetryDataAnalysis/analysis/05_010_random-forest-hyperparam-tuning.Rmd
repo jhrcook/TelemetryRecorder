@@ -1,0 +1,36 @@
+---
+title: "Hyperparameter tuning of the Random Forest Classifier"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, comment = "#>", dpi = 500)
+
+suppressPackageStartupMessages(library(tidymodels))
+suppressPackageStartupMessages(library(depmixS4))
+
+suppressPackageStartupMessages(library(kableExtra))
+
+source(here::here("start.R"))
+theme_set(theme_minimal())
+set.seed(0)
+```
+
+The purpose of this notebook is the comprehensively tune the hyperparameters of a Random Forest (RF) Classifier for detecting states of a push-up.
+The [*Hidden Markov Model-based learning pipelines*](05_008_hmm_pipelines.md) notebook demonstrated that a RF is likely the best model for this task, though did not pursue full optimization of the classifier.
+
+
+## Data
+
+The data used here was cached in [*Hidden Markov Model-based learning pipelines*](05_008_hmm_pipelines.md).
+
+```{r}
+processed_pushup_data <- readRDS(
+  here(file.path("cache", "hmm_processed_pushup_data.rds"))
+)
+processed_pushup_data
+```
+
+## Hyperparameter tuning
+
+**To-Do**: learn about the tuning process available in TidyModels
