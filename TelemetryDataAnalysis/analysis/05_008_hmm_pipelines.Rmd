@@ -6,7 +6,7 @@ output: github_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, comment = "#>", dpi = 500)
 
-suppressPackageStartupMessages(library(discrim))
+suppressPackageStartupMessages(library(discrim))  # for Naive Bayes function
 suppressPackageStartupMessages(library(tidymodels))
 suppressPackageStartupMessages(library(depmixS4))
 
@@ -252,6 +252,15 @@ if (!"full_data" %in% colnames(chopped_pushup_hmms)) {
 }
 
 chopped_pushup_hmms$classifier_data <- pmap(chopped_pushup_hmms, chop_data_with_hmm)
+```
+
+Save this collection of data for use in other notebooks.
+
+```{r}
+saveRDS(
+  chopped_pushup_hmms,
+  file.path("cache", "hmm_processed_pushup_data.rds")
+)
 ```
 
 ```{r}

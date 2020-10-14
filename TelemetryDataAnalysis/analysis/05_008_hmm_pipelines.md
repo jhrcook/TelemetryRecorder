@@ -280,6 +280,13 @@ probability of either state 1 or 2 is less than 0.90. Additional
     #> Flipping state assignments.
     #> Flipping state assignments.
 
+Save this collection of data for use in other notebooks.
+
+    saveRDS(
+      chopped_pushup_hmms,
+      file.path("cache", "hmm_processed_pushup_data.rds")
+    )
+
     chopped_pushup_hmms %.% {
       select(workout_idx, classifier_data)
       unnest(classifier_data)
@@ -325,7 +332,7 @@ A t-SNE plot of the data made to train the classifiers.
         title = "t-SNE of push-up telemetry data"
       )
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
 ### 4. Train a classifier with the HMM-prepared training data.
 
@@ -506,7 +513,7 @@ classification model types.
 
     plot_classifier_tuning_results(coarse_tuning_knn, x = neighbors)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
     n_rep <- 20
     fine_knn_k <- seq(15, 31, 1)
@@ -527,7 +534,7 @@ classification model types.
 
     plot_classifier_tuning_results(fine_tuning_knn, neighbors)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 #### Random forest hyperparameter tuning
 
@@ -551,7 +558,7 @@ classification model types.
     plot_classifier_tuning_results(coarse_tuning_rf, x = trees, mtry) +
       facet_grid(mtry ~ test_train)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
     n_rep <- 10
     fine_rf_grid <- expand.grid(
@@ -572,7 +579,7 @@ classification model types.
 
     plot_classifier_tuning_results(fine_tuning_rf, x = trees, mtry)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 #### Naive Bayes hyperparameter tuning
 
@@ -596,7 +603,7 @@ classification model types.
 
     plot_classifier_tuning_results(coarse_tuning_nb, x = smoothness)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
 
 #### SVM hyperparameter tuning
 
@@ -620,7 +627,7 @@ classification model types.
     plot_classifier_tuning_results(coarse_tuning_svm, x = cost, rbf_sigma) +
       facet_grid(rbf_sigma ~ test_train, scales = "free_y")
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
     n_rep <- 10
     fine_svm_grid <- expand_grid(
@@ -642,7 +649,7 @@ classification model types.
     plot_classifier_tuning_results(fine_tuning_svm, x = cost, rbf_sigma) +
       facet_grid(rbf_sigma ~ test_train)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
 
 ### Table of best classifier hyperparameters
 
@@ -754,7 +761,7 @@ experimentation as it tends to be a bit tricky to train and tune.
         y = "average value"
       )
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
 
     optimal_models_cross_validation %.%
       {
@@ -774,7 +781,7 @@ experimentation as it tends to be a bit tricky to train and tune.
       geom_boxplot(aes(color = model_type), outlier.shape = NA) +
       geom_jitter(aes(color = model_type), height = 0, width = 0.3, alpha = 0.3)
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
     optimal_models_cross_validation %.%
       {
@@ -814,7 +821,7 @@ experimentation as it tends to be a bit tricky to train and tune.
         subtitle = "The colors indicate different workout data sets and the dashed lines are when\nthe model was trained on that workout data set."
       )
 
-![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
 
 ### 5. Applying the trained model to new data
 
