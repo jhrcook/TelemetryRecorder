@@ -19,6 +19,7 @@ set.seed(0)
 The purpose of this notebook is the comprehensively tune the hyperparameters of a Random Forest (RF) Classifier for detecting states of a push-up.
 The [*Hidden Markov Model-based learning pipelines*](05_008_hmm_pipelines.md) notebook demonstrated that a RF is likely the best model for this task, though did not pursue full optimization of the classifier.
 
+(Also try an XGBoost: [tutorial](https://juliasilge.com/blog/xgboost-tune-volleyball/).)
 
 ## Data
 
@@ -31,6 +32,207 @@ processed_pushup_data <- readRDS(
 processed_pushup_data
 ```
 
-## Hyperparameter tuning
+```{r}
+# Data set of tuning model.
+pushup_data <- processed_pushup_data$classifier_data[[1]]
 
-**To-Do**: learn about the tuning process available in TidyModels
+# Training and testing split.
+pushup_split <- initial_split(pushup_data, strata = state)
+pushup_train <- training(pushup_split)
+pushup_test <- testing(pushup_split)
+```
+
+## TidyModels workflow
+
+### Recipe
+
+```{r}
+pushup_spec <- recipe(
+  state ~ time_step + idx + x + y + z + pitch + yaw + roll,
+  data = pushup_train
+) %>%
+  update_role(idx, time_step, new_role = "ID")
+
+pushup_spec
+```
+
+```{r}
+pushup_spec$var_info
+```
+
+
+### Model Specification
+
+```{r}
+tune_spec <- rand_forest(
+  mtry = tune(),
+  trees = tune(),
+  min_n = tune()
+) %>%
+  set_mode("classification") %>%
+  set_engine(
+    "ranger",
+    max.depth = tune()
+  )
+
+tune_spec
+```
+
+
+### Cross Validation data split
+
+```{r}
+pushup_cvfolds <- vfold_cv(pushup_train, v = 10)
+pushup_cvfolds
+```
+
+### Workflow
+
+```{r}
+pushup_tune_wf <- workflow() %>%
+  add_recipe(pushup_spec) %>%
+  add_model(tune_spec)
+
+pushup_tune_wf
+```
+
+
+### Hyperparameter grid search
+
+#### Coarse
+
+```{r}
+# Param for `max.depth` hyperparameter
+max_depth <- new_quant_param(
+  type = "integer",
+  range = c(1, 200),
+  inclusive = c(TRUE, TRUE),
+  default = 50,
+  trans = scales::identity_trans(),
+  label = c(max_depth = "max.depth"),
+  finalize = NULL
+)
+
+# Parameters for coarse tuning.
+rf_params_coarse <- pushup_tune_wf %>%
+  parameters() %>%
+  update(
+    mtry = mtry(range = c(1L, 6L)),
+    trees = trees(range = c(20L, 2000L)),
+    min_n = min_n(),
+    max.depth = max_depth
+  )
+
+# Random coarse tuning grid.
+set.seed(0)
+coarse_rand_grid <- grid_random(rf_params_coarse, size = 100)
+GGally::ggpairs(coarse_rand_grid, progress = FALSE)
+
+# Metrics to collect.
+tuning_metric_set <- metric_set(
+  sensitivity, specificity, accuracy, roc_auc
+)
+
+# Register cores for parallel processing.
+doParallel::registerDoParallel()
+
+stash(
+  "rf_tune_coarse",
+  depends_on = c("coarse_rand_grid", "tuning_metric_set"),
+  {
+    rf_tune_coarse <- tune_grid(
+      pushup_tune_wf,
+      resamples = pushup_cvfolds,
+      grid = coarse_rand_grid,
+      metrics = tuning_metric_set
+    )
+  }
+)
+```
+
+```{r}
+rf_param_tuning_plot <- function(tune_res, metric) {
+  tune_res %>%
+    collect_metrics() %>%
+    filter(.metric == !!metric) %>%
+    select(mean, mtry:max.depth) %>%
+    pivot_longer(
+      mtry:max.depth,
+      values_to = "value",
+      names_to = "parameter"
+    ) %>%
+    ggplot(aes(value, mean, color = parameter)) +
+    facet_wrap(~parameter, scales = "free_x") +
+    geom_point(show.legend = FALSE) +
+    geom_smooth(method = "loess", formula = "y ~ x") +
+    scale_color_brewer(type = "qual", palette = "Set1") +
+    labs(
+      x = NULL,
+      y = metric
+    )
+}
+```
+
+```{r}
+tibble(
+  metric = c("accuracy", "roc_auc", "sens", "spec"),
+  y_min = c(0.96, 0.996, 0.96, 0.98)
+) %>%
+  pwalk(function(metric, y_min) {
+    p <- rf_param_tuning_plot(rf_tune_coarse, metric) +
+      scale_y_continuous(
+        limits = c(y_min, 1), 
+        expand = expansion(mult = c(0, 0))
+      )
+    plot(p)
+  })
+```
+
+#### Fine
+
+**Need to choose values for `rf_params_fine`.**
+
+```{r}
+# Param for `max.depth` hyperparameter
+max_depth2 <- new_quant_param(
+  type = "integer",
+  range = c(75, 125),
+  inclusive = c(TRUE, TRUE),
+  default = 50,
+  trans = scales::identity_trans(),
+  label = c(max_depth = "max.depth"),
+  finalize = NULL
+)
+
+# Parameters for coarse tuning.
+rf_params_fine <- pushup_tune_wf %>%
+  parameters() %>%
+  update(
+    mtry = mtry(range = c(1L, 3L)),
+    trees = trees(range = c(600L, 1100L)),
+    min_n = min_n(range = c(10, 20)),
+    max.depth = max_depth2
+  )
+
+# Random fine tuning grid.
+set.seed(0)
+fine_rand_grid <- grid_random(rf_params_fine, size = 100)
+GGally::ggpairs(coarse_rand_grid, progress = FALSE)
+
+# Register cores for parallel processing.
+# doParallel::registerDoParallel()
+# 
+# stash(
+#   "rf_tune_fine",
+#   depends_on = c("fine_rand_grid", "tuning_metric_set"),
+#   {
+#     rf_tune_fine <- tune_grid(
+#       pushup_tune_wf,
+#       resamples = pushup_cvfolds,
+#       grid = fine_rand_grid,
+#       metrics = tuning_metric_set
+#     )
+#   }
+# )
+```
+
