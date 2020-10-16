@@ -21,6 +21,12 @@ The [*Hidden Markov Model-based learning pipelines*](05_008_hmm_pipelines.md) no
 
 (Also try an XGBoost: [tutorial](https://juliasilge.com/blog/xgboost-tune-volleyball/).)
 
+**To-Do**: 
+
+- clean up the XGBoost experimental section
+- comment on whether to use RF or XGBoost
+- select optimal hyperparameters for best model
+
 ## Data
 
 The data used here was cached in [*Hidden Markov Model-based learning pipelines*](05_008_hmm_pipelines.md).
@@ -99,7 +105,7 @@ pushup_tune_wf
 
 ### Hyperparameter grid search
 
-#### Coarse
+#### Coarse random grid search
 
 ```{r}
 # Param for `max.depth` hyperparameter
@@ -130,7 +136,7 @@ GGally::ggpairs(coarse_rand_grid, progress = FALSE)
 
 # Metrics to collect.
 tuning_metric_set <- metric_set(
-  sensitivity, specificity, accuracy, roc_auc
+  sensitivity, specificity, accuracy, roc_auc, ppv
 )
 
 # Register cores for parallel processing.
@@ -151,13 +157,13 @@ stash(
 ```
 
 ```{r}
-rf_param_tuning_plot <- function(tune_res, metric) {
+rf_param_tuning_plot <- function(tune_res, metric, param1 = mtry, param2 = max.depth) {
   tune_res %>%
     collect_metrics() %>%
     filter(.metric == !!metric) %>%
-    select(mean, mtry:max.depth) %>%
+    select(mean, {{ param1 }}:{{ param2 }}) %>%
     pivot_longer(
-      mtry:max.depth,
+      {{ param1 }}:{{ param2 }},
       values_to = "value",
       names_to = "parameter"
     ) %>%
@@ -175,22 +181,21 @@ rf_param_tuning_plot <- function(tune_res, metric) {
 
 ```{r}
 tibble(
-  metric = c("accuracy", "roc_auc", "sens", "spec"),
-  y_min = c(0.96, 0.996, 0.96, 0.98)
+  metric = c("accuracy", "roc_auc", "sens", "spec", "ppv"),
+  y_min = c(0.96, 0.996, 0.96, 0.98, 0.95)
 ) %>%
   pwalk(function(metric, y_min) {
     p <- rf_param_tuning_plot(rf_tune_coarse, metric) +
       scale_y_continuous(
-        limits = c(y_min, 1), 
+        limits = c(y_min, 1),
         expand = expansion(mult = c(0, 0))
       )
     plot(p)
   })
 ```
 
-#### Fine
 
-**Need to choose values for `rf_params_fine`.**
+#### Fine random grid search
 
 ```{r}
 # Param for `max.depth` hyperparameter
@@ -198,7 +203,7 @@ max_depth2 <- new_quant_param(
   type = "integer",
   range = c(75, 125),
   inclusive = c(TRUE, TRUE),
-  default = 50,
+  default = 100,
   trans = scales::identity_trans(),
   label = c(max_depth = "max.depth"),
   finalize = NULL
@@ -208,8 +213,8 @@ max_depth2 <- new_quant_param(
 rf_params_fine <- pushup_tune_wf %>%
   parameters() %>%
   update(
-    mtry = mtry(range = c(1L, 3L)),
-    trees = trees(range = c(600L, 1100L)),
+    mtry = mtry(range = c(1L, 1L)),
+    trees = trees(range = c(500L, 1000L)),
     min_n = min_n(range = c(10, 20)),
     max.depth = max_depth2
   )
@@ -217,22 +222,106 @@ rf_params_fine <- pushup_tune_wf %>%
 # Random fine tuning grid.
 set.seed(0)
 fine_rand_grid <- grid_random(rf_params_fine, size = 100)
-GGally::ggpairs(coarse_rand_grid, progress = FALSE)
 
-# Register cores for parallel processing.
-# doParallel::registerDoParallel()
-# 
-# stash(
-#   "rf_tune_fine",
-#   depends_on = c("fine_rand_grid", "tuning_metric_set"),
-#   {
-#     rf_tune_fine <- tune_grid(
-#       pushup_tune_wf,
-#       resamples = pushup_cvfolds,
-#       grid = fine_rand_grid,
-#       metrics = tuning_metric_set
-#     )
-#   }
-# )
+stash(
+  "rf_tune_fine",
+  depends_on = c("fine_rand_grid", "tuning_metric_set"),
+  {
+    rf_tune_fine <- tune_grid(
+      pushup_tune_wf,
+      resamples = pushup_cvfolds,
+      grid = fine_rand_grid,
+      metrics = tuning_metric_set
+    )
+  }
+)
+```
+
+```{r}
+tibble(
+  metric = c("accuracy", "roc_auc", "sens", "spec", "ppv"),
+  y_min = c(0.96, 0.996, 0.96, 0.98, 0.95)
+) %>%
+  pwalk(function(metric, y_min) {
+    p <- rf_param_tuning_plot(rf_tune_fine, metric) +
+      scale_y_continuous(
+        limits = c(y_min, 1),
+        expand = expansion(mult = c(0, 0))
+      )
+    plot(p)
+  })
+```
+
+---
+
+## XGBoost
+
+```{r}
+xgb_spec <- boost_tree(
+  mtry = tune(),
+  trees = tune(),
+  min_n = tune(),
+  tree_depth = tune(),
+  learn_rate = tune(),
+  loss_reduction = tune(),
+  sample_size = tune()
+) %>%
+  set_engine("xgboost") %>% 
+  set_mode("classification")
+
+xgb_spec
+```
+
+```{r}
+pushup_xgb_tune_wf <- workflow() %>%
+  add_recipe(pushup_spec) %>%
+  add_model(xgb_spec)
+```
+
+```{r}
+set.seed(0)
+xgb_coarse_grid <- grid_random(
+  mtry(range = c(1L, 6L)),
+  trees(range = c(50, 2000)),
+  min_n(),
+  tree_depth(),
+  learn_rate(),
+  loss_reduction(),
+  sample_size = sample_prop(),
+  size = 100
+)
+
+stash(
+  "xgb_tune_coarse",
+  depends_on = c("xgb_coarse_grid", "tuning_metric_set"),
+  {
+    xgb_tune_coarse <- tune_grid(
+      pushup_xgb_tune_wf,
+      resamples = pushup_cvfolds,
+      grid = xgb_coarse_grid,
+      metrics = tuning_metric_set
+    )
+  }
+)
+```
+
+```{r, warning=FALSE}
+tibble(
+  metric = c("accuracy", "roc_auc", "sens", "spec", "ppv"),
+  y_min = c(0.95, 0.95, 0.95, 0.95, 0.95)
+) %>%
+  pwalk(function(metric, y_min) {
+    p <- rf_param_tuning_plot(
+      xgb_tune_coarse, 
+      metric, 
+      param1 = mtry, 
+      param2 = loss_reduction
+    ) +
+      scale_y_continuous(
+        limits = c(y_min, 1),
+        expand = expansion(mult = c(0, 0))
+      )
+    plot(p)
+  })
 ```
 
