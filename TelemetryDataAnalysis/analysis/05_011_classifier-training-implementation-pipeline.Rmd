@@ -17,12 +17,13 @@ suppressPackageStartupMessages(library(kableExtra))
 
 source(here::here("start.R"))
 theme_set(theme_minimal())
-set.seed(0)
+set.seed(123)
 ```
 
 ## Goal
 
 The goal of this notebook is to construct and refine a pipeline for training and implementing a classifier that detects the states of a push-up.
+The RF hyperparameters were tuned in a previous notebook [Hyperparameter tuning of the Random Forest Classifier](../analysis/05_010_random-forest-hyperparam-tuning.md).
 
 ## Pipeline
 
@@ -220,7 +221,7 @@ pushup_hmm <- construct_pushup_hmm(hmm_fit_data)
 pushup_hmm <- fit(pushup_hmm)
 ```
 ```{r}
-train_dataset %>%
+a <- train_dataset %>%
   filter(date %in% hmm_fit_data$date) %>%
   plot_hmm_fit(pushup_hmm, data_x = scaled_smooth_value)
 ```
@@ -277,20 +278,33 @@ table(rf_training_data$state)
 ### 4. Train Random Forest Classifier
 
 ```{r}
-run_rf_workflow <- function(data, mtry = 3, trees = 100) {
+run_rf_workflow <- function(data, 
+                            mtry = 1, 
+                            trees = 10, 
+                            min_n = 10, 
+                            max.depth = 10) {
   rf_spec <- rand_forest(
     mode = "classification",
     mtry = mtry,
     trees = trees,
-    min_n = 50
+    min_n = min_n
   ) %>%
-    set_engine("ranger")
+    set_engine(
+      "ranger", 
+      max.depth = max.depth
+    )
   run_classifier_workflow(data, rf_spec)
 }
 ```
 
 ```{r}
-pushup_rf_res <- run_rf_workflow(rf_training_data, mtry = 1, trees = 16)
+pushup_rf_res <- run_rf_workflow(
+  rf_training_data, 
+  mtry = 1, 
+  trees = 600,
+  min_n = 14,
+  max.depth = 100
+)
 pushup_rf <- pushup_rf_res$fit_model[[1]]
 ```
 
@@ -314,6 +328,33 @@ pushup_rf_res %.%
     )
   } %>%
   knitr::kable()
+```
+
+```{r}
+pushup_rf_res %.% {
+  select(train_roc_curve, test_roc_curve)
+  pivot_longer(-c())
+  mutate(
+    train_test = ifelse(str_detect(name, "train"), "train", "test"),
+    name = str_remove(name, "train_|test_"),
+    name = str_replace(name, "_", "-")
+  )
+  unnest(value)
+} %>%
+  ggplot(aes(x = 1-sensitivity, specificity)) +
+  facet_grid(train_test ~ .level) +
+  geom_line(
+    aes(color = train_test), 
+    size = 1, 
+    alpha = 1
+  ) +
+  scale_color_brewer(
+    type = "qual", 
+    palette = "Set1", 
+    guide = FALSE
+  ) +
+  scale_x_continuous(expand = expansion(mult = c(0.01, 0))) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.01)))
 ```
 
 

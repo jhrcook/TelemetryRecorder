@@ -8,14 +8,15 @@ pipelines*](05_008_hmm_pipelines.md) notebook demonstrated that a RF is
 likely the best model for this task, though did not pursue full
 optimization of the classifier.
 
-(Also try an XGBoost:
-[tutorial](https://juliasilge.com/blog/xgboost-tune-volleyball/).)
+At the end, an XGBoost model is also trained and tuned as a potential
+replacement for the RF.
 
-**To-Do**:
-
--   clean up the XGBoost experimental section
--   comment on whether to use RF or XGBoost
--   select optimal hyperparameters for best model
+Two blog-posts from Dr. Julia Silge that were useful guides for
+hyperparameter turning with the [‘TidyModels’]() library: [*Tuning
+random forest hyperparameters with \#TidyTuesday trees
+data*](https://juliasilge.com/blog/sf-trees-random-tuning/) and [*Tune
+XGBoost with tidymodels and \#TidyTuesday beach
+volleyball*](https://juliasilge.com/blog/xgboost-tune-volleyball/).
 
 Data
 ----
@@ -163,17 +164,6 @@ TidyModels workflow
 
 #### Coarse random grid search
 
-    # Param for `max.depth` hyperparameter
-    max_depth <- new_quant_param(
-      type = "integer",
-      range = c(1, 200),
-      inclusive = c(TRUE, TRUE),
-      default = 50,
-      trans = scales::identity_trans(),
-      label = c(max_depth = "max.depth"),
-      finalize = NULL
-    )
-
     # Parameters for coarse tuning.
     rf_params_coarse <- pushup_tune_wf %>%
       parameters() %>%
@@ -181,7 +171,7 @@ TidyModels workflow
         mtry = mtry(range = c(1L, 6L)),
         trees = trees(range = c(20L, 2000L)),
         min_n = min_n(),
-        max.depth = max_depth
+        max.depth = tree_depth(range = c(1, 200))
       )
 
     # Random coarse tuning grid.
@@ -218,7 +208,11 @@ TidyModels workflow
 
     #> Loading stashed object.
 
-    rf_param_tuning_plot <- function(tune_res, metric, param1 = mtry, param2 = max.depth) {
+    # Plot the results of a `metric` for all of the tuning hyperparameters.
+    rf_param_tuning_plot <- function(tune_res, 
+                                     metric, 
+                                     param1 = mtry, 
+                                     param2 = max.depth) {
       tune_res %>%
         collect_metrics() %>%
         filter(.metric == !!metric) %>%
@@ -252,48 +246,37 @@ TidyModels workflow
         plot(p)
       })
 
-    #> Warning: Removed 8 rows containing non-finite values (stat_smooth).
+    #> Warning: Removed 4 rows containing non-finite values (stat_smooth).
 
-    #> Warning: Removed 8 rows containing missing values (geom_point).
+    #> Warning: Removed 4 rows containing missing values (geom_point).
 
 ![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
-    #> Warning: Removed 12 rows containing non-finite values (stat_smooth).
+    #> Warning: Removed 8 rows containing non-finite values (stat_smooth).
 
-    #> Warning: Removed 12 rows containing missing values (geom_point).
+    #> Warning: Removed 8 rows containing missing values (geom_point).
 
 ![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-10-2.png)<!-- -->
 
-    #> Warning: Removed 8 rows containing non-finite values (stat_smooth).
+    #> Warning: Removed 4 rows containing non-finite values (stat_smooth).
 
-    #> Warning: Removed 8 rows containing missing values (geom_point).
+    #> Warning: Removed 4 rows containing missing values (geom_point).
 
 ![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-10-3.png)<!-- -->
 
-    #> Warning: Removed 8 rows containing non-finite values (stat_smooth).
+    #> Warning: Removed 4 rows containing non-finite values (stat_smooth).
 
-    #> Warning: Removed 8 rows containing missing values (geom_point).
+    #> Warning: Removed 4 rows containing missing values (geom_point).
 
 ![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-10-4.png)<!-- -->
 
-    #> Warning: Removed 8 rows containing non-finite values (stat_smooth).
+    #> Warning: Removed 4 rows containing non-finite values (stat_smooth).
 
-    #> Warning: Removed 8 rows containing missing values (geom_point).
+    #> Warning: Removed 4 rows containing missing values (geom_point).
 
 ![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-10-5.png)<!-- -->
 
 #### Fine random grid search
-
-    # Param for `max.depth` hyperparameter
-    max_depth2 <- new_quant_param(
-      type = "integer",
-      range = c(75, 125),
-      inclusive = c(TRUE, TRUE),
-      default = 100,
-      trans = scales::identity_trans(),
-      label = c(max_depth = "max.depth"),
-      finalize = NULL
-    )
 
     # Parameters for coarse tuning.
     rf_params_fine <- pushup_tune_wf %>%
@@ -302,7 +285,7 @@ TidyModels workflow
         mtry = mtry(range = c(1L, 1L)),
         trees = trees(range = c(500L, 1000L)),
         min_n = min_n(range = c(10, 20)),
-        max.depth = max_depth2
+        max.depth = tree_depth(range = c(75, 125))
       )
 
     # Random fine tuning grid.
@@ -339,10 +322,47 @@ TidyModels workflow
 
 ![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-2.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-3.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-4.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-5.png)<!-- -->
 
+    metrics <- unique(collect_metrics(rf_tune_fine)$.metric)[1:3]
+    map_dfr(metrics, ~ show_best(rf_tune_fine, metric = .x)) %>%
+      knitr::kable(format = "markdown")
+
+| mtry | trees | min\_n | max.depth | .metric  | .estimator |      mean |   n |  std\_err | .config  |
+|-----:|------:|-------:|----------:|:---------|:-----------|----------:|----:|----------:|:---------|
+|    1 |   842 |     17 |        82 | accuracy | multiclass | 0.9827895 |  10 | 0.0020383 | Model013 |
+|    1 |   602 |     14 |       103 | accuracy | multiclass | 0.9827895 |  10 | 0.0020383 | Model024 |
+|    1 |   720 |     11 |        77 | accuracy | multiclass | 0.9827895 |  10 | 0.0020383 | Model027 |
+|    1 |   805 |     12 |        83 | accuracy | multiclass | 0.9827895 |  10 | 0.0020383 | Model080 |
+|    1 |   607 |     11 |       111 | accuracy | multiclass | 0.9814737 |  10 | 0.0021682 | Model003 |
+|    1 |   805 |     12 |        83 | ppv      | macro      | 0.9828378 |  10 | 0.0021679 | Model080 |
+|    1 |   842 |     17 |        82 | ppv      | macro      | 0.9826360 |  10 | 0.0022535 | Model013 |
+|    1 |   602 |     14 |       103 | ppv      | macro      | 0.9826360 |  10 | 0.0022535 | Model024 |
+|    1 |   720 |     11 |        77 | ppv      | macro      | 0.9826360 |  10 | 0.0022535 | Model027 |
+|    1 |   828 |     12 |       107 | ppv      | macro      | 0.9817267 |  10 | 0.0025038 | Model011 |
+|    1 |   855 |     11 |        78 | roc\_auc | hand\_till | 0.9990318 |  10 | 0.0002819 | Model093 |
+|    1 |   544 |     10 |        88 | roc\_auc | hand\_till | 0.9990269 |  10 | 0.0003006 | Model006 |
+|    1 |   532 |     12 |        89 | roc\_auc | hand\_till | 0.9990187 |  10 | 0.0002951 | Model005 |
+|    1 |   703 |     10 |       100 | roc\_auc | hand\_till | 0.9990102 |  10 | 0.0003073 | Model041 |
+|    1 |   905 |     11 |       119 | roc\_auc | hand\_till | 0.9990023 |  10 | 0.0002999 | Model056 |
+
+### Optimal hyperparameters
+
+| **hyperparameter** | **value** |
+|--------------------|-----------|
+| mtry               | 1         |
+| trees              | 600       |
+| min\_n             | 14        |
+| max.depth          | 100       |
+
 ------------------------------------------------------------------------
 
 XGBoost
 -------
+
+If a RF classifier performs well, often a XGBoost can increased
+performance. Therefore, some exploration of this drop-in replacement is
+conducted below.
+
+### Tuning hyperparameters
 
     xgb_spec <- boost_tree(
       mtry = tune(),
@@ -420,4 +440,11 @@ XGBoost
         plot(p)
       })
 
-![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-16-2.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-16-3.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-16-4.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-16-5.png)<!-- -->
+![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-2.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-3.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-4.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-5.png)<!-- -->
+
+### Conclusion
+
+It does not seem like there is improvement from using an XGBoost model,
+likely because the RF model performed as well as could be hoped for.
+There are drawbacks to using a boosted model (e.g. non-parallel
+training), so I will continue with the RF.

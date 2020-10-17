@@ -19,13 +19,10 @@ set.seed(0)
 The purpose of this notebook is the comprehensively tune the hyperparameters of a Random Forest (RF) Classifier for detecting states of a push-up.
 The [*Hidden Markov Model-based learning pipelines*](05_008_hmm_pipelines.md) notebook demonstrated that a RF is likely the best model for this task, though did not pursue full optimization of the classifier.
 
-(Also try an XGBoost: [tutorial](https://juliasilge.com/blog/xgboost-tune-volleyball/).)
+At the end, an XGBoost model is also trained and tuned as a potential replacement for the RF.
 
-**To-Do**: 
+Two blog-posts from Dr. Julia Silge that were useful guides for hyperparameter turning with the ['TidyModels']() library: [*Tuning random forest hyperparameters with #TidyTuesday trees data*](https://juliasilge.com/blog/sf-trees-random-tuning/) and [*Tune XGBoost with tidymodels and #TidyTuesday beach volleyball*](https://juliasilge.com/blog/xgboost-tune-volleyball/).
 
-- clean up the XGBoost experimental section
-- comment on whether to use RF or XGBoost
-- select optimal hyperparameters for best model
 
 ## Data
 
@@ -108,17 +105,6 @@ pushup_tune_wf
 #### Coarse random grid search
 
 ```{r}
-# Param for `max.depth` hyperparameter
-max_depth <- new_quant_param(
-  type = "integer",
-  range = c(1, 200),
-  inclusive = c(TRUE, TRUE),
-  default = 50,
-  trans = scales::identity_trans(),
-  label = c(max_depth = "max.depth"),
-  finalize = NULL
-)
-
 # Parameters for coarse tuning.
 rf_params_coarse <- pushup_tune_wf %>%
   parameters() %>%
@@ -126,7 +112,7 @@ rf_params_coarse <- pushup_tune_wf %>%
     mtry = mtry(range = c(1L, 6L)),
     trees = trees(range = c(20L, 2000L)),
     min_n = min_n(),
-    max.depth = max_depth
+    max.depth = tree_depth(range = c(1, 200))
   )
 
 # Random coarse tuning grid.
@@ -157,7 +143,11 @@ stash(
 ```
 
 ```{r}
-rf_param_tuning_plot <- function(tune_res, metric, param1 = mtry, param2 = max.depth) {
+# Plot the results of a `metric` for all of the tuning hyperparameters.
+rf_param_tuning_plot <- function(tune_res, 
+                                 metric, 
+                                 param1 = mtry, 
+                                 param2 = max.depth) {
   tune_res %>%
     collect_metrics() %>%
     filter(.metric == !!metric) %>%
@@ -198,17 +188,6 @@ tibble(
 #### Fine random grid search
 
 ```{r}
-# Param for `max.depth` hyperparameter
-max_depth2 <- new_quant_param(
-  type = "integer",
-  range = c(75, 125),
-  inclusive = c(TRUE, TRUE),
-  default = 100,
-  trans = scales::identity_trans(),
-  label = c(max_depth = "max.depth"),
-  finalize = NULL
-)
-
 # Parameters for coarse tuning.
 rf_params_fine <- pushup_tune_wf %>%
   parameters() %>%
@@ -216,7 +195,7 @@ rf_params_fine <- pushup_tune_wf %>%
     mtry = mtry(range = c(1L, 1L)),
     trees = trees(range = c(500L, 1000L)),
     min_n = min_n(range = c(10, 20)),
-    max.depth = max_depth2
+    max.depth = tree_depth(range = c(75, 125))
   )
 
 # Random fine tuning grid.
@@ -252,9 +231,29 @@ tibble(
   })
 ```
 
+```{r}
+metrics <- unique(collect_metrics(rf_tune_fine)$.metric)[1:3]
+map_dfr(metrics, ~ show_best(rf_tune_fine, metric = .x)) %>%
+  knitr::kable(format = "markdown")
+```
+
+### Optimal hyperparameters
+
+| **hyperparameter** | **value** |
+|--------------------|-----------|
+| mtry               | 1         |
+| trees              | 600       |
+| min_n              | 14        |
+| max.depth          | 100       |
+
 ---
 
 ## XGBoost
+
+If a RF classifier performs well, often a XGBoost can increased performance.
+Therefore, some exploration of this drop-in replacement is conducted below.
+
+### Tuning hyperparameters
 
 ```{r}
 xgb_spec <- boost_tree(
@@ -325,3 +324,7 @@ tibble(
   })
 ```
 
+### Conclusion
+
+It does not seem like there is improvement from using an XGBoost model, likely because the RF model performed as well as could  be hoped for.
+There are drawbacks to using a boosted model (e.g. non-parallel training), so I will continue with the RF.

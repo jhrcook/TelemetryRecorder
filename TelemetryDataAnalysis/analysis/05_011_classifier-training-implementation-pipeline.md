@@ -6,7 +6,9 @@ Goal
 
 The goal of this notebook is to construct and refine a pipeline for
 training and implementing a classifier that detects the states of a
-push-up.
+push-up. The RF hyperparameters were tuned in a previous notebook
+[Hyperparameter tuning of the Random Forest
+Classifier](../analysis/05_010_random-forest-hyperparam-tuning.md).
 
 Pipeline
 --------
@@ -175,15 +177,13 @@ Pipeline
     pushup_hmm <- construct_pushup_hmm(hmm_fit_data)
     pushup_hmm <- fit(pushup_hmm)
 
-    #> converged at iteration 47 with logLik: 935.1952
+    #> converged at iteration 26 with logLik: 935.1952
 
-    train_dataset %>%
+    a <- train_dataset %>%
       filter(date %in% hmm_fit_data$date) %>%
       plot_hmm_fit(pushup_hmm, data_x = scaled_smooth_value)
 
 ![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
-
-    #> NULL
 
 ### 3. Chop data into states
 
@@ -234,18 +234,31 @@ Pipeline
 
 ### 4. Train Random Forest Classifier
 
-    run_rf_workflow <- function(data, mtry = 3, trees = 100) {
+    run_rf_workflow <- function(data, 
+                                mtry = 1, 
+                                trees = 10, 
+                                min_n = 10, 
+                                max.depth = 10) {
       rf_spec <- rand_forest(
         mode = "classification",
         mtry = mtry,
         trees = trees,
-        min_n = 50
+        min_n = min_n
       ) %>%
-        set_engine("ranger")
+        set_engine(
+          "ranger", 
+          max.depth = max.depth
+        )
       run_classifier_workflow(data, rf_spec)
     }
 
-    pushup_rf_res <- run_rf_workflow(rf_training_data, mtry = 1, trees = 16)
+    pushup_rf_res <- run_rf_workflow(
+      rf_training_data, 
+      mtry = 1, 
+      trees = 600,
+      min_n = 14,
+      max.depth = 100
+    )
     pushup_rf <- pushup_rf_res$fit_model[[1]]
 
     pushup_rf_res %.%
@@ -312,34 +325,34 @@ npv
 train
 </td>
 <td style="text-align:right;">
-0.9999402
+0.9999840
 </td>
 <td style="text-align:right;">
-0.9871251
+0.9949109
 </td>
 <td style="text-align:right;">
-0.9934469
+0.9973453
 </td>
 <td style="text-align:right;">
-0.9867079
+0.9947793
 </td>
 <td style="text-align:right;">
-0.9802968
+0.9920879
 </td>
 <td style="text-align:right;">
-0.9867629
+0.9948131
 </td>
 <td style="text-align:right;">
-0.9867725
+0.994709
 </td>
 <td style="text-align:right;">
-0.9801397
+0.9920540
 </td>
 <td style="text-align:right;">
-0.9867079
+0.9947793
 </td>
 <td style="text-align:right;">
-0.9933923
+0.9973226
 </td>
 </tr>
 <tr>
@@ -347,45 +360,72 @@ train
 test
 </td>
 <td style="text-align:right;">
-0.9974383
+0.9979038
 </td>
 <td style="text-align:right;">
-0.9807538
+0.9769669
 </td>
 <td style="text-align:right;">
-0.9902604
+0.9883336
 </td>
 <td style="text-align:right;">
-0.9796175
+0.9757988
 </td>
 <td style="text-align:right;">
-0.9702875
+0.9645698
 </td>
 <td style="text-align:right;">
-0.9798653
+0.9757799
 </td>
 <td style="text-align:right;">
-0.9800000
+0.976000
 </td>
 <td style="text-align:right;">
-0.9699844
+0.9639908
 </td>
 <td style="text-align:right;">
-0.9796175
+0.9757988
 </td>
 <td style="text-align:right;">
-0.9899355
+0.9880468
 </td>
 </tr>
 </tbody>
 </table>
+
+    pushup_rf_res %.% {
+      select(train_roc_curve, test_roc_curve)
+      pivot_longer(-c())
+      mutate(
+        train_test = ifelse(str_detect(name, "train"), "train", "test"),
+        name = str_remove(name, "train_|test_"),
+        name = str_replace(name, "_", "-")
+      )
+      unnest(value)
+    } %>%
+      ggplot(aes(x = 1-sensitivity, specificity)) +
+      facet_grid(train_test ~ .level) +
+      geom_line(
+        aes(color = train_test), 
+        size = 1, 
+        alpha = 1
+      ) +
+      scale_color_brewer(
+        type = "qual", 
+        palette = "Set1", 
+        guide = FALSE
+      ) +
+      scale_x_continuous(expand = expansion(mult = c(0.01, 0))) +
+      scale_y_continuous(expand = expansion(mult = c(0, 0.01)))
+
+![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
 
 ### 5. Smooth new data to be classified
 
     new_dataset <- apply_smoothing_trans(new_dataset, x = value)
     plot_telmetry_data(df = new_dataset, x = smooth_value)
 
-![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 ### 6. Make predictions on new data
 
@@ -473,4 +513,4 @@ test
     (telemetry_plot / pred_plot / pred_bar_plot) +
       plot_layout(heights = c(4, 4, 1))
 
-![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](05_011_classifier-training-implementation-pipeline_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->

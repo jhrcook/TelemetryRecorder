@@ -21,4 +21,4 @@ A random forest fit on one set of data was able to reliably identify the states 
 
 ### To-Do
 
-1. In a new notebook, focus on tuning all of the random forest hyperparameters available through 'ranger'. Use the information learned for the random forest in [Refinement of the classifier training and implementation pipeline](analysis/05_011_classifier-training-implementation-pipeline.md).
+1. The RF is having difficulty with identifying the push-up states in new data. I need to som planning and brainstorming to figure out ways to improve this.
