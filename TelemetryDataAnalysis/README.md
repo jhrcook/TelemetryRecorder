@@ -21,4 +21,10 @@ A random forest fit on one set of data was able to reliably identify the states 
 
 ### To-Do
 
-1. The RF is having difficulty with identifying the push-up states in new data. I need to som planning and brainstorming to figure out ways to improve this.
+1. (DONE) Update [Experimentation of a data processing and classification workflow](analysis/05_008_hmm_pipelines.md) to use the smoothed (not scaled) data for training the RF.
+2. Revisit [Hyperparameter tuning of the Random Forest Classifier](analysis/05_010_random-forest-hyperparam-tuning.md) with the updated input data and better understanding of how model sees the data.
+  - use a lower `max.depth`
+3. In a new notebook, experiment with using another "meta"-classifier to distinguish between unknown and push-up states. 
+  - SVM seems promising
+  - keep in mind how this process would work with real streams of data
+    - some sort of animation could be useful (using the t-SNE or PCA projections)
