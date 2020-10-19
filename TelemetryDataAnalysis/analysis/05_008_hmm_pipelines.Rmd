@@ -62,8 +62,18 @@ apply_smoothing_trans <- function(df,
 
 transform_pushup_data <- function(df) {
   df %>%
-    apply_scale_trans() %>%
-    apply_smoothing_trans(x = scaled_value)
+    apply_scale_trans(
+      x = value,
+      y = scaled_value
+    ) %>%
+    apply_smoothing_trans(
+      x = value,
+      y = smooth_value
+    ) %>%
+    apply_smoothing_trans(
+      x = scaled_value,
+      y = scaled_smooth_value
+    )
 }
 
 
@@ -78,7 +88,8 @@ pushup_data <- tibble(filename = get_data_file_names(data_dir)) %.% {
     data = map(data, ~ rename(.x, time_step = date)),
     data = map(data, ~ select(
       .x,
-      time_step, idx, motion, axis, value, scaled_value, smooth_value
+      time_step, idx, motion, axis, 
+      value, scaled_value, smooth_value, scaled_smooth_value
     ))
   )
   select(-all_data, -filename)
@@ -125,7 +136,7 @@ chopped_pushup_data %>%
   ungroup()
 
 chopped_pushup_data %>%
-  ggplot(aes(x = time_step, y = smooth_value)) +
+  ggplot(aes(x = time_step, y = scaled_smooth_value)) +
   facet_wrap(~workout_idx, scales = "free", ncol = 2) +
   geom_line(aes(color = axis))
 ```
@@ -177,7 +188,7 @@ construct_pushup_hmm <- function(d, nstates = 2) {
 chopped_pushup_hmms <- chopped_pushup_data %.% {
   nest_pushup_exercises()
   mutate(
-    wide_data = map(data, pivot_telemetry_data, x = smooth_value),
+    wide_data = map(data, pivot_telemetry_data, x = scaled_smooth_value),
     model = map(wide_data, construct_pushup_hmm),
     fit = map(model, fit)
   )
@@ -208,16 +219,22 @@ chop_data_with_hmm <- function(workout_idx,
                                fit,
                                wide_data,
                                full_data,
-                               prob_cutoff = 0.9,
+                               prob_cutoff = 0.5,
                                outer_unknown_q = 0.1,
                                ...) {
+  
+  modeling_data <- pivot_telemetry_data(full_data, x = smooth_value) 
+  
   training_data_1 <- posterior(fit) %.% {
-    bind_cols(wide_data)
+    bind_cols(
+      modeling_data %>% filter(idx %in% wide_data$idx)
+    )
     mutate(state = case_when(
       S1 > prob_cutoff ~ "state1",
       S2 > prob_cutoff ~ "state2",
-      TRUE ~ "unknown"
+      TRUE ~ "IGNORE"
     ))
+    filter(state != "IGNORE")
   }
 
   if (workout_idx %in% DATASETS_TO_REVERSE_STATES) {
@@ -231,12 +248,11 @@ chop_data_with_hmm <- function(workout_idx,
     }
   }
 
-  training_data_2 <- full_data %.% {
+  training_data_2 <- modeling_data %.% {
     filter(
       time_step < quantile(time_step, 0.1) |
         time_step > quantile(time_step, 1 - 0.1)
     )
-    pivot_telemetry_data(x = smooth_value)
     add_column(state = "unknown")
   }
 

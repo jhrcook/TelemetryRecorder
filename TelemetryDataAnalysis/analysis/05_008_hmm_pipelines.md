@@ -48,8 +48,18 @@ Data
 
     transform_pushup_data <- function(df) {
       df %>%
-        apply_scale_trans() %>%
-        apply_smoothing_trans(x = scaled_value)
+        apply_scale_trans(
+          x = value,
+          y = scaled_value
+        ) %>%
+        apply_smoothing_trans(
+          x = value,
+          y = smooth_value
+        ) %>%
+        apply_smoothing_trans(
+          x = scaled_value,
+          y = scaled_smooth_value
+        )
     }
 
 
@@ -64,7 +74,8 @@ Data
         data = map(data, ~ rename(.x, time_step = date)),
         data = map(data, ~ select(
           .x,
-          time_step, idx, motion, axis, value, scaled_value, smooth_value
+          time_step, idx, motion, axis, 
+          value, scaled_value, smooth_value, scaled_smooth_value
         ))
       )
       select(-all_data, -filename)
@@ -77,12 +88,12 @@ Data
     #> # A tibble: 6 x 5
     #>   workout_idx exercise reps  date                data                 
     #>         <int> <chr>    <chr> <dttm>              <list>               
-    #> 1           1 Push-Ups 10    2020-10-03 17:43:59 <tibble [10,086 × 7]>
-    #> 2           2 Push-Ups 10    2020-10-04 13:24:29 <tibble [9,288 × 7]> 
-    #> 3           3 Push-Ups 10    2020-10-04 13:25:57 <tibble [11,082 × 7]>
-    #> 4           4 Push-Ups 10    2020-10-05 12:36:09 <tibble [10,596 × 7]>
-    #> 5           5 Push-Ups 10    2020-10-05 12:36:49 <tibble [11,898 × 7]>
-    #> 6           6 Push-Ups 10    2020-10-11 08:43:16 <tibble [10,830 × 7]>
+    #> 1           1 Push-Ups 10    2020-10-03 17:43:59 <tibble [10,086 × 8]>
+    #> 2           2 Push-Ups 10    2020-10-04 13:24:29 <tibble [9,288 × 8]> 
+    #> 3           3 Push-Ups 10    2020-10-04 13:25:57 <tibble [11,082 × 8]>
+    #> 4           4 Push-Ups 10    2020-10-05 12:36:09 <tibble [10,596 × 8]>
+    #> 5           5 Push-Ups 10    2020-10-05 12:36:49 <tibble [11,898 × 8]>
+    #> 6           6 Push-Ups 10    2020-10-11 08:43:16 <tibble [10,830 × 8]>
 
 Overview
 --------
@@ -133,7 +144,7 @@ Select only the time steps in the 30 and 70 percentiles.
     #> 6           6          721
 
     chopped_pushup_data %>%
-      ggplot(aes(x = time_step, y = smooth_value)) +
+      ggplot(aes(x = time_step, y = scaled_smooth_value)) +
       facet_wrap(~workout_idx, scales = "free", ncol = 2) +
       geom_line(aes(color = axis))
 
@@ -182,7 +193,7 @@ Select only the time steps in the 30 and 70 percentiles.
     chopped_pushup_hmms <- chopped_pushup_data %.% {
       nest_pushup_exercises()
       mutate(
-        wide_data = map(data, pivot_telemetry_data, x = smooth_value),
+        wide_data = map(data, pivot_telemetry_data, x = scaled_smooth_value),
         model = map(wide_data, construct_pushup_hmm),
         fit = map(model, fit)
       )
@@ -231,16 +242,22 @@ probability of either state 1 or 2 is less than 0.90. Additional
                                    fit,
                                    wide_data,
                                    full_data,
-                                   prob_cutoff = 0.9,
+                                   prob_cutoff = 0.5,
                                    outer_unknown_q = 0.1,
                                    ...) {
+      
+      modeling_data <- pivot_telemetry_data(full_data, x = smooth_value) 
+      
       training_data_1 <- posterior(fit) %.% {
-        bind_cols(wide_data)
+        bind_cols(
+          modeling_data %>% filter(idx %in% wide_data$idx)
+        )
         mutate(state = case_when(
           S1 > prob_cutoff ~ "state1",
           S2 > prob_cutoff ~ "state2",
-          TRUE ~ "unknown"
+          TRUE ~ "IGNORE"
         ))
+        filter(state != "IGNORE")
       }
 
       if (workout_idx %in% DATASETS_TO_REVERSE_STATES) {
@@ -254,12 +271,11 @@ probability of either state 1 or 2 is less than 0.90. Additional
         }
       }
 
-      training_data_2 <- full_data %.% {
+      training_data_2 <- modeling_data %.% {
         filter(
           time_step < quantile(time_step, 0.1) |
             time_step > quantile(time_step, 1 - 0.1)
         )
-        pivot_telemetry_data(x = smooth_value)
         add_column(state = "unknown")
       }
 
@@ -297,12 +313,12 @@ Save this collection of data for use in other notebooks.
     #> # A tibble: 6 x 4
     #>   workout_idx state1 state2 unknown
     #>         <int>  <int>  <int>   <int>
-    #> 1           1    312    346     349
-    #> 2           2    361    248     319
-    #> 3           3    420    304     383
-    #> 4           4    384    308     368
-    #> 5           5    471    305     415
-    #> 6           6    427    280     376
+    #> 1           1    316    355     336
+    #> 2           2    365    253     310
+    #> 3           3    427    310     370
+    #> 4           4    390    316     354
+    #> 5           5    477    316     398
+    #> 6           6    433    288     362
 
 A t-SNE plot of the data made to train the classifiers.
 
@@ -396,55 +412,13 @@ classification model types.
       run_svm_workflow(eg_training_data)
     )
 
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 624
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 630
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 631
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 639
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 217
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 218
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 219
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 624
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 630
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 631
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 639
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 217
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 218
-
-    #> Warning in FUN(X[[i]], ...): Numerical 0 probability for all classes with
-    #> observation 219
-
     #> # A tibble: 4 x 27
     #>   fit_model train_pred_prob train_roc_curve train_roc_auc test_pred_prob
     #>   <list>    <list>          <list>                  <dbl> <list>        
     #> 1 <workflo… <tibble [756 ×… <tibble [56 × …         1.00  <tibble [251 …
-    #> 2 <workflo… <tibble [756 ×… <tibble [558 ×…         1.00  <tibble [251 …
-    #> 3 <workflo… <tibble [756 ×… <tibble [2,268…         0.998 <tibble [251 …
-    #> 4 <workflo… <tibble [756 ×… <tibble [2,274…         0.999 <tibble [251 …
+    #> 2 <workflo… <tibble [756 ×… <tibble [466 ×…         1.00  <tibble [251 …
+    #> 3 <workflo… <tibble [756 ×… <tibble [2,268…         0.999 <tibble [251 …
+    #> 4 <workflo… <tibble [756 ×… <tibble [2,274…         1.00  <tibble [251 …
     #> # … with 22 more variables: test_roc_curve <list>, test_roc_auc <dbl>,
     #> #   train_pred_class <list>, train_sensitivity <dbl>, train_specificity <dbl>,
     #> #   train_precision <dbl>, train_mcc <dbl>, train_fmeasure <dbl>,
@@ -717,6 +691,342 @@ experimentation as it tends to be a bit tricky to train and tune.
 
     #> Updating stash.
 
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 365
+    #> 'state2': 253
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
+    #> Warning: Problem with `mutate()` input `testing_metrics`.
+    #> x While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+    #> ℹ Input `testing_metrics` is `map2(fit_model, classifier_data, pushup_classification_metrics)`.
+
+    #> Warning: While computing multiclass `precision()`, some levels had no predicted events (i.e. `true_positive + false_positive = 0`). 
+    #> Precision is undefined in this case, and those levels will be removed from the averaged result.
+    #> Note that the following number of true events actually occured for each problematic event level:
+    #> 'state1': 390
+    #> 'state2': 316
+
     optimal_models_cross_validation %.%
       {
         select(
@@ -780,6 +1090,10 @@ experimentation as it tends to be a bit tricky to train and tune.
       facet_wrap(~metric, nrow = 2, scales = "free") +
       geom_boxplot(aes(color = model_type), outlier.shape = NA) +
       geom_jitter(aes(color = model_type), height = 0, width = 0.3, alpha = 0.3)
+
+    #> Warning: Removed 10 rows containing non-finite values (stat_boxplot).
+
+    #> Warning: Removed 10 rows containing missing values (geom_point).
 
 ![](05_008_hmm_pipelines_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
