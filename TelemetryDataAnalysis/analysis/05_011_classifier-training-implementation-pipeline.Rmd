@@ -233,8 +233,8 @@ a <- train_dataset %>%
 prepare_rf_training_data <- function(hmm,
                                      hmm_data,
                                      full_data,
-                                     prob_cutoff = 0.9,
-                                     outer_unknown_q = 0.1) {
+                                     prob_cutoff = 0.50,
+                                     outer_unknown_q = 0.10) {
   hmm_posterior <- bind_cols(
     hmm_data,
     posterior(hmm)
@@ -243,8 +243,9 @@ prepare_rf_training_data <- function(hmm,
     mutate(state = case_when(
       S1 > prob_cutoff ~ "state1",
       S2 > prob_cutoff ~ "state2",
-      TRUE ~ "unknown"
+      TRUE ~ "IGNORE"
     ))
+    filter(state != "IGNORE")
   }
 
 
@@ -262,13 +263,14 @@ prepare_rf_training_data <- function(hmm,
 }
 ```
 
+
 ```{r}
 rf_training_data <- prepare_rf_training_data(
   hmm = pushup_hmm,
   hmm_data = train_dataset %>%
     filter(date %in% hmm_fit_data$date) %>%
     pivot_telemetry_data(x = smooth_value),
-  full_data = pivot_telemetry_data(train_dataset),
+  full_data = pivot_telemetry_data(train_dataset, x = smooth_value),
 )
 
 table(rf_training_data$state)
@@ -300,10 +302,10 @@ run_rf_workflow <- function(data,
 ```{r}
 pushup_rf_res <- run_rf_workflow(
   rf_training_data, 
-  mtry = 1, 
-  trees = 600,
+  mtry = 1,
+  trees = 1000,
   min_n = 14,
-  max.depth = 100
+  max.depth = 3
 )
 pushup_rf <- pushup_rf_res$fit_model[[1]]
 ```
@@ -427,8 +429,8 @@ pred_plot <- rf_new_pred %.%
       smooth_prob = slider::slide_dbl(
         prob,
         mean,
-        .before = 20,
-        .after = 20
+        .before = 5,
+        .after = 5
       )
     )
   } %>%
@@ -459,3 +461,7 @@ pred_bar_plot <- rf_new_pred %>%
 (telemetry_plot / pred_plot / pred_bar_plot) +
   plot_layout(heights = c(4, 4, 1))
 ```
+The predictions on new data are quite poor.
+The 'unknown' group seems to confuse the RF when the person is actually doing push-ups.
+However, we know that there should not be any 'unknown' once the push-ups begin, only at the ends.
+One option is to make the state declared 'unknown' only when it has been continuous for 1 second.
