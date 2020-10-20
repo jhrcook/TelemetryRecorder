@@ -110,7 +110,7 @@ rf_params_coarse <- pushup_tune_wf %>%
   parameters() %>%
   update(
     mtry = mtry(range = c(1L, 6L)),
-    trees = trees(range = c(20L, 2000L)),
+    trees = trees(range = c(100L, 2000L)),
     min_n = min_n(),
     max.depth = tree_depth(range = c(1, 200))
   )
@@ -144,9 +144,9 @@ stash(
 
 ```{r}
 # Plot the results of a `metric` for all of the tuning hyperparameters.
-rf_param_tuning_plot <- function(tune_res, 
-                                 metric, 
-                                 param1 = mtry, 
+rf_param_tuning_plot <- function(tune_res,
+                                 metric,
+                                 param1 = mtry,
                                  param2 = max.depth) {
   tune_res %>%
     collect_metrics() %>%
@@ -184,6 +184,23 @@ tibble(
   })
 ```
 
+```{r}
+collect_metrics(rf_tune_coarse) %.%
+  {
+    group_by(.metric)
+    top_n(n = 5, wt = mean)
+    ungroup()
+    arrange(.metric, mean, -mtry - trees - min_n - max.depth)
+    mutate(idx = row_number())
+    select(idx, mtry:.metric)
+    pivot_longer(-c(.metric, idx))
+  } %>%
+  ggplot(aes(x = .metric, y = value)) +
+  facet_wrap(~name, scales = "free_y") +
+  geom_boxplot(aes(color = .metric, fill = .metric), outlier.shape = NA, alpha = 0.1) +
+  geom_jitter(aes(color = .metric), height = 0, width = 0.2, alpha = 0.8)
+```
+
 
 #### Fine random grid search
 
@@ -192,10 +209,10 @@ tibble(
 rf_params_fine <- pushup_tune_wf %>%
   parameters() %>%
   update(
-    mtry = mtry(range = c(1L, 1L)),
-    trees = trees(range = c(500L, 1000L)),
-    min_n = min_n(range = c(10, 20)),
-    max.depth = tree_depth(range = c(75, 125))
+    mtry = mtry(range = c(2L, 3L)),
+    trees = trees(range = c(1000L, 2000L)),
+    min_n = min_n(range = c(3, 20)),
+    max.depth = tree_depth(range = c(2, 10))
   )
 
 # Random fine tuning grid.
@@ -241,10 +258,10 @@ map_dfr(metrics, ~ show_best(rf_tune_fine, metric = .x)) %>%
 
 | **hyperparameter** | **value** |
 |--------------------|-----------|
-| mtry               | 1         |
-| trees              | 600       |
-| min_n              | 14        |
-| max.depth          | 100       |
+| mtry               | 2         |
+| trees              | 1200      |
+| min_n              | 9         |
+| max.depth          | 8         |
 
 ---
 
@@ -265,7 +282,7 @@ xgb_spec <- boost_tree(
   loss_reduction = tune(),
   sample_size = tune()
 ) %>%
-  set_engine("xgboost") %>% 
+  set_engine("xgboost") %>%
   set_mode("classification")
 
 xgb_spec
@@ -311,9 +328,9 @@ tibble(
 ) %>%
   pwalk(function(metric, y_min) {
     p <- rf_param_tuning_plot(
-      xgb_tune_coarse, 
-      metric, 
-      param1 = mtry, 
+      xgb_tune_coarse,
+      metric,
+      param1 = mtry,
       param2 = loss_reduction
     ) +
       scale_y_continuous(

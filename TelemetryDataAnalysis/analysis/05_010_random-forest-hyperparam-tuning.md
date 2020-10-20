@@ -140,14 +140,14 @@ TidyModels workflow
 
     pushup_tune_wf
 
-    #> ══ Workflow ═══════════════════════════════════════════════════════════════════════════════════════════════
+    #> ══ Workflow ════════════════════════════════════════════════════════════════════
     #> Preprocessor: Recipe
     #> Model: rand_forest()
     #> 
-    #> ── Preprocessor ───────────────────────────────────────────────────────────────────────────────────────────
+    #> ── Preprocessor ────────────────────────────────────────────────────────────────
     #> 0 Recipe Steps
     #> 
-    #> ── Model ──────────────────────────────────────────────────────────────────────────────────────────────────
+    #> ── Model ───────────────────────────────────────────────────────────────────────
     #> Random Forest Model Specification (classification)
     #> 
     #> Main Arguments:
@@ -169,7 +169,7 @@ TidyModels workflow
       parameters() %>%
       update(
         mtry = mtry(range = c(1L, 6L)),
-        trees = trees(range = c(20L, 2000L)),
+        trees = trees(range = c(100L, 2000L)),
         min_n = min_n(),
         max.depth = tree_depth(range = c(1, 200))
       )
@@ -209,9 +209,9 @@ TidyModels workflow
     #> Loading stashed object.
 
     # Plot the results of a `metric` for all of the tuning hyperparameters.
-    rf_param_tuning_plot <- function(tune_res, 
-                                     metric, 
-                                     param1 = mtry, 
+    rf_param_tuning_plot <- function(tune_res,
+                                     metric,
+                                     param1 = mtry,
                                      param2 = max.depth) {
       tune_res %>%
         collect_metrics() %>%
@@ -252,9 +252,9 @@ TidyModels workflow
 
 ![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
 
-    #> Warning: Removed 8 rows containing non-finite values (stat_smooth).
+    #> Warning: Removed 4 rows containing non-finite values (stat_smooth).
 
-    #> Warning: Removed 8 rows containing missing values (geom_point).
+    #> Warning: Removed 4 rows containing missing values (geom_point).
 
 ![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-10-2.png)<!-- -->
 
@@ -276,16 +276,33 @@ TidyModels workflow
 
 ![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-10-5.png)<!-- -->
 
+    collect_metrics(rf_tune_coarse) %.%
+      {
+        group_by(.metric)
+        top_n(n = 5, wt = mean)
+        ungroup()
+        arrange(.metric, mean, -mtry - trees - min_n - max.depth)
+        mutate(idx = row_number())
+        select(idx, mtry:.metric)
+        pivot_longer(-c(.metric, idx))
+      } %>%
+      ggplot(aes(x = .metric, y = value)) +
+      facet_wrap(~name, scales = "free_y") +
+      geom_boxplot(aes(color = .metric, fill = .metric), outlier.shape = NA, alpha = 0.1) +
+      geom_jitter(aes(color = .metric), height = 0, width = 0.2, alpha = 0.8)
+
+![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
+
 #### Fine random grid search
 
     # Parameters for coarse tuning.
     rf_params_fine <- pushup_tune_wf %>%
       parameters() %>%
       update(
-        mtry = mtry(range = c(1L, 1L)),
-        trees = trees(range = c(500L, 1000L)),
-        min_n = min_n(range = c(10, 20)),
-        max.depth = tree_depth(range = c(75, 125))
+        mtry = mtry(range = c(2L, 3L)),
+        trees = trees(range = c(1000L, 2000L)),
+        min_n = min_n(range = c(3, 20)),
+        max.depth = tree_depth(range = c(2, 10))
       )
 
     # Random fine tuning grid.
@@ -320,7 +337,195 @@ TidyModels workflow
         plot(p)
       })
 
-![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-1.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-2.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-3.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-4.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-12-5.png)<!-- -->
+    #> Warning: Removed 52 rows containing non-finite values (stat_smooth).
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : pseudoinverse used at 1.995
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : neighborhood radius 1.005
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : reciprocal condition number 0
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : There are other near singularities as well. 1.01
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : pseudoinverse used at
+    #> 1.995
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : neighborhood radius
+    #> 1.005
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : reciprocal condition
+    #> number 0
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : There are other near
+    #> singularities as well. 1.01
+
+    #> Warning: Removed 52 rows containing missing values (geom_point).
+
+![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+
+    #> Warning: Removed 52 rows containing non-finite values (stat_smooth).
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : pseudoinverse used at 1.995
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : neighborhood radius 1.005
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : reciprocal condition number 0
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : There are other near singularities as well. 1.01
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : pseudoinverse used at
+    #> 1.995
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : neighborhood radius
+    #> 1.005
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : reciprocal condition
+    #> number 0
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : There are other near
+    #> singularities as well. 1.01
+
+    #> Warning: Removed 52 rows containing missing values (geom_point).
+
+![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-13-2.png)<!-- -->
+
+    #> Warning: Removed 52 rows containing non-finite values (stat_smooth).
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : pseudoinverse used at 1.995
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : neighborhood radius 1.005
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : reciprocal condition number 0
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : There are other near singularities as well. 1.01
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : pseudoinverse used at
+    #> 1.995
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : neighborhood radius
+    #> 1.005
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : reciprocal condition
+    #> number 0
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : There are other near
+    #> singularities as well. 1.01
+
+    #> Warning: Removed 52 rows containing missing values (geom_point).
+
+![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-13-3.png)<!-- -->
+
+    #> Warning: Removed 52 rows containing non-finite values (stat_smooth).
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : pseudoinverse used at 1.995
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : neighborhood radius 1.005
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : reciprocal condition number 0
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : There are other near singularities as well. 1.01
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : pseudoinverse used at
+    #> 1.995
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : neighborhood radius
+    #> 1.005
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : reciprocal condition
+    #> number 0
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : There are other near
+    #> singularities as well. 1.01
+
+    #> Warning: Removed 52 rows containing missing values (geom_point).
+
+![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-13-4.png)<!-- -->
+
+    #> Warning: Removed 44 rows containing non-finite values (stat_smooth).
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : pseudoinverse used at 1.995
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : neighborhood radius 1.005
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : reciprocal condition number 0
+
+    #> Warning in simpleLoess(y, x, w, span, degree = degree, parametric =
+    #> parametric, : There are other near singularities as well. 1.01
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : pseudoinverse used at
+    #> 1.995
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : neighborhood radius
+    #> 1.005
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : reciprocal condition
+    #> number 0
+
+    #> Warning in predLoess(object$y, object$x, newx = if
+    #> (is.null(newdata)) object$x else if (is.data.frame(newdata))
+    #> as.matrix(model.frame(delete.response(terms(object)), : There are other near
+    #> singularities as well. 1.01
+
+    #> Warning: Removed 44 rows containing missing values (geom_point).
+
+![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-13-5.png)<!-- -->
 
     metrics <- unique(collect_metrics(rf_tune_fine)$.metric)[1:3]
     map_dfr(metrics, ~ show_best(rf_tune_fine, metric = .x)) %>%
@@ -328,30 +533,30 @@ TidyModels workflow
 
 | mtry | trees | min\_n | max.depth | .metric  | .estimator |      mean |   n |  std\_err | .config  |
 |-----:|------:|-------:|----------:|:---------|:-----------|----------:|----:|----------:|:---------|
-|    1 |   842 |     17 |        82 | accuracy | multiclass | 0.9827895 |  10 | 0.0020383 | Model013 |
-|    1 |   602 |     14 |       103 | accuracy | multiclass | 0.9827895 |  10 | 0.0020383 | Model024 |
-|    1 |   720 |     11 |        77 | accuracy | multiclass | 0.9827895 |  10 | 0.0020383 | Model027 |
-|    1 |   805 |     12 |        83 | accuracy | multiclass | 0.9827895 |  10 | 0.0020383 | Model080 |
-|    1 |   607 |     11 |       111 | accuracy | multiclass | 0.9814737 |  10 | 0.0021682 | Model003 |
-|    1 |   805 |     12 |        83 | ppv      | macro      | 0.9828378 |  10 | 0.0021679 | Model080 |
-|    1 |   842 |     17 |        82 | ppv      | macro      | 0.9826360 |  10 | 0.0022535 | Model013 |
-|    1 |   602 |     14 |       103 | ppv      | macro      | 0.9826360 |  10 | 0.0022535 | Model024 |
-|    1 |   720 |     11 |        77 | ppv      | macro      | 0.9826360 |  10 | 0.0022535 | Model027 |
-|    1 |   828 |     12 |       107 | ppv      | macro      | 0.9817267 |  10 | 0.0025038 | Model011 |
-|    1 |   855 |     11 |        78 | roc\_auc | hand\_till | 0.9990318 |  10 | 0.0002819 | Model093 |
-|    1 |   544 |     10 |        88 | roc\_auc | hand\_till | 0.9990269 |  10 | 0.0003006 | Model006 |
-|    1 |   532 |     12 |        89 | roc\_auc | hand\_till | 0.9990187 |  10 | 0.0002951 | Model005 |
-|    1 |   703 |     10 |       100 | roc\_auc | hand\_till | 0.9990102 |  10 | 0.0003073 | Model041 |
-|    1 |   905 |     11 |       119 | roc\_auc | hand\_till | 0.9990023 |  10 | 0.0002999 | Model056 |
+|    2 |  1360 |     10 |         8 | accuracy | multiclass | 0.9880702 |  10 | 0.0046268 | Model075 |
+|    2 |  1134 |      6 |        10 | accuracy | multiclass | 0.9880702 |  10 | 0.0046268 | Model085 |
+|    2 |  1286 |      5 |         7 | accuracy | multiclass | 0.9867368 |  10 | 0.0052490 | Model008 |
+|    3 |  1575 |      7 |        10 | accuracy | multiclass | 0.9867368 |  10 | 0.0052490 | Model020 |
+|    2 |  1989 |      9 |         8 | accuracy | multiclass | 0.9867368 |  10 | 0.0052490 | Model021 |
+|    2 |  1360 |     10 |         8 | ppv      | macro      | 0.9877772 |  10 | 0.0048046 | Model075 |
+|    2 |  1134 |      6 |        10 | ppv      | macro      | 0.9877772 |  10 | 0.0048046 | Model085 |
+|    2 |  1286 |      5 |         7 | ppv      | macro      | 0.9864860 |  10 | 0.0053903 | Model008 |
+|    3 |  1575 |      7 |        10 | ppv      | macro      | 0.9864860 |  10 | 0.0053903 | Model020 |
+|    2 |  1989 |      9 |         8 | ppv      | macro      | 0.9864860 |  10 | 0.0053903 | Model021 |
+|    2 |  1128 |      5 |         8 | roc\_auc | hand\_till | 0.9997179 |  10 | 0.0001478 | Model030 |
+|    2 |  1134 |      6 |        10 | roc\_auc | hand\_till | 0.9997179 |  10 | 0.0001478 | Model085 |
+|    2 |  1286 |      5 |         7 | roc\_auc | hand\_till | 0.9996613 |  10 | 0.0001732 | Model008 |
+|    2 |  1989 |      9 |         8 | roc\_auc | hand\_till | 0.9996613 |  10 | 0.0001732 | Model021 |
+|    2 |  1489 |      7 |         7 | roc\_auc | hand\_till | 0.9996613 |  10 | 0.0001732 | Model022 |
 
 ### Optimal hyperparameters
 
 | **hyperparameter** | **value** |
 |--------------------|-----------|
-| mtry               | 1         |
-| trees              | 600       |
-| min\_n             | 14        |
-| max.depth          | 100       |
+| mtry               | 2         |
+| trees              | 1200      |
+| min\_n             | 9         |
+| max.depth          | 8         |
 
 ------------------------------------------------------------------------
 
@@ -373,7 +578,7 @@ conducted below.
       loss_reduction = tune(),
       sample_size = tune()
     ) %>%
-      set_engine("xgboost") %>% 
+      set_engine("xgboost") %>%
       set_mode("classification")
 
     xgb_spec
@@ -428,9 +633,9 @@ conducted below.
     ) %>%
       pwalk(function(metric, y_min) {
         p <- rf_param_tuning_plot(
-          xgb_tune_coarse, 
-          metric, 
-          param1 = mtry, 
+          xgb_tune_coarse,
+          metric,
+          param1 = mtry,
           param2 = loss_reduction
         ) +
           scale_y_continuous(
@@ -440,7 +645,7 @@ conducted below.
         plot(p)
       })
 
-![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-2.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-3.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-4.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-17-5.png)<!-- -->
+![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-18-2.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-18-3.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-18-4.png)<!-- -->![](05_010_random-forest-hyperparam-tuning_files/figure-gfm/unnamed-chunk-18-5.png)<!-- -->
 
 ### Conclusion
 
